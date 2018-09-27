@@ -1,0 +1,11 @@
+language: python
+
+python: 3.6
+
+install:
+  - pip install pip --upgrade
+  - pip install -e .
+  - pip install -e '.[peer,tests]'
+
+script:
+  - ./test.sh
