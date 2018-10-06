@@ -62,10 +62,10 @@ class CommandHandler(Simple, ProcessReplyMixin):
         return await self.commander.execute(self.request.path, j, progress_cb, self)
 
 class WSHandler(SimpleWebSocketBase, ProcessReplyMixin):
-    def initialize(self, commander, progress_cb, server_time):
+    def initialize(self, server_time, wsconnections, commander, progress_cb):
         self.commander = commander
         self.progress_cb = progress_cb
-        super().initialize(server_time)
+        super().initialize(server_time, wsconnections)
 
     async def process_message(self, path, body, message_id, progress_cb):
         def pcb(message, stack_extra=0, **kwargs):

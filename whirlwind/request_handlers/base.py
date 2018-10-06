@@ -16,19 +16,22 @@ class Finished(Exception):
         self.kwargs = kwargs
         self.kwargs["status"] = status
 
+    def as_dict(self):
+        return self.kwargs
+
 def reprer(o):
     if type(o) is bytes:
         return binascii.hexlify(o).decode()
     return repr(o)
 
 class MessageFromExc:
-    def __call__(self, exc):
+    def __call__(self, exc_type, exc, tb):
         if isinstance(exc, Finished):
             return exc.kwargs
         else:
-            return self.process(exc)
+            return self.process(exc_type, exc, tb)
 
-    def process(self, exc, as_dct):
+    def process(self, exc_type, exc, tb):
         return {"status": 500, "error": "Internal Server Error", "error_code": "InternalServerError"}
 
 class AsyncCatcher(object):

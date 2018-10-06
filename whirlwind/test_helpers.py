@@ -1,3 +1,4 @@
+from asynctest import TestCase as AsyncTestCase
 from tornado.websocket import websocket_connect
 from input_algorithms import spec_base as sb
 from contextlib import contextmanager
@@ -54,6 +55,13 @@ def modified_env(**env):
             else:
                 os.environ[key] = val
 
+class AsyncTestCase(AsyncTestCase):
+    async def wait_for(self, fut, timeout=1):
+        try:
+            return await asyncio.wait_for(fut, timeout=timeout)
+        except asyncio.TimeoutError as error:
+            assert False, "Failed to wait for future before timeout: {0}".format(error)
+
 class WSStream:
     def __init__(self, server, test):
         self.test = test
@@ -102,13 +110,17 @@ class ServerRunner:
                 yield
             wrapper = wrapper()
 
+        self.port = port
         self.server = server
         self.wrapper = wrapper
         self.final_future = final_future
 
-        self.setup(*args, **kwargs)
+        self.server_args = args
+        self.server_kwargs = kwargs
 
-    def setup(self, *args, **kwargs):
+        self.setup()
+
+    def setup(self):
         pass
 
     def test_start(self):
@@ -141,7 +153,7 @@ class ServerRunner:
     async def start(self):
         async def doit():
             with self.wrapper:
-                await self.server.serve()
+                await self.server.serve("127.0.0.1", self.port, *self.server_args, **self.server_kwargs)
         assert not port_connected(self.port)
         self.t = async_as_background(doit())
 
@@ -167,16 +179,7 @@ class ServerRunner:
             except asyncio.CancelledError:
                 pass
 
-        for thing in self.server.cleaners:
-            try:
-                await thing()
-            except:
-                pass
-
-        # Prevent coroutine not awaited error
-        await asyncio.sleep(0.01)
-
-        await self.after_close()
+        await asyncio.wait_for(self.after_close(), timeout=5)
 
         assert not port_connected(self.port)
 
