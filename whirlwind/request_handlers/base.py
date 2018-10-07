@@ -159,8 +159,7 @@ class RequestsMixin:
         if hasattr(msg, "as_dict"):
             msg = msg.as_dict()
 
-        if hasattr(self, "process_reply"):
-            self.process_reply(msg, exc_info=exc_info)
+        self.hook("process_reply", msg, exc_info=exc_info)
 
         if type(msg) is dict:
             status = msg.get("status", status)
@@ -297,8 +296,8 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
         reply = {"reply": msg, "message_id": message_id}
         reply = json.dumps(reply, default=lambda o: repr(o)).replace("</", "<\\/")
 
-        if message_id not in ("__tick__", "__server_time__") and hasattr(self, "process_reply"):
-            self.process_reply(msg, exc_info=exc_info)
+        if message_id not in ("__tick__", "__server_time__"):
+            self.hook("process_reply", msg, exc_info=exc_info)
 
         if self.ws_connection:
             self.write_message(reply)
