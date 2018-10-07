@@ -8,6 +8,12 @@ setup(
     , packages = ['whirlwind'] + ['whirlwind.%s' % pkg for pkg in find_packages('whirlwind')]
     , include_package_data = True
 
+    , install_requires =
+      [ "tornado >= 5.1.1"
+      , "option_merge >= 1.6"
+      , "input_algorithms >= 0.6.0"
+      ]
+
     , extras_require =
       { "tests":
         [ "noseOfYeti>=1.7"
