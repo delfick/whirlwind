@@ -1,13 +1,21 @@
+from whirlwind.commander import Command
+
 from input_algorithms.errors import BadSpecValue
+from input_algorithms.dictobj import dictobj
 from input_algorithms import spec_base as sb
 from collections import defaultdict
 
 class Store:
+    Command = Command
+
     def __init__(self, prefix=None, default_path="/v1", formatter=None):
         self.prefix = self.normalise_prefix(prefix)
         self.formatter = formatter
         self.default_path = default_path
         self.paths = defaultdict(dict)
+
+    def injected(self, path):
+        return dictobj.Field(sb.overridden(f"{{{path}}}"), formatted=True)
 
     def normalise_prefix(self, prefix, trailing_slash=True):
         if prefix is None:

@@ -157,7 +157,7 @@ describe TestCase, "Store":
             store = Store(formatter=Formatter)
 
             @store.command("thing", path="/v1")
-            class Thing(dictobj.Spec):
+            class Thing(store.Command):
                 one = dictobj.Field(sb.integer_spec)
                 two = dictobj.Field(sb.string_spec)
                 three = dictobj.Field(sb.overridden("{wat}"), formatted=True)
@@ -171,7 +171,7 @@ describe TestCase, "Store":
             store = Store()
 
             @store.command("thing", path="/v1")
-            class Thing(dictobj.Spec):
+            class Thing(store.Command):
                 one = dictobj.Field(sb.integer_spec)
                 two = dictobj.Field(sb.string_spec)
 
@@ -190,7 +190,7 @@ describe TestCase, "Store":
                 )
 
             @store.command("one/other", path="/v1")
-            class Other(dictobj.Spec):
+            class Other(store.Command):
                 three = dictobj.Field(sb.integer_spec)
                 four = dictobj.Field(sb.boolean)
 
@@ -210,7 +210,7 @@ describe TestCase, "Store":
                 )
 
             @store.command("stuff", path="/v2")
-            class Stuff(dictobj.Spec):
+            class Stuff(store.Command):
                 five = dictobj.Field(sb.string_spec)
                 six = dictobj.Field(sb.boolean)
 
@@ -251,15 +251,15 @@ describe TestCase, "Store":
             meta = Meta({"wat": wat}, [])
 
             @store.command("thing")
-            class Thing(dictobj.Spec):
+            class Thing(store.Command):
                 one = dictobj.Field(sb.integer_spec)
 
             @store.command("other")
-            class Other(dictobj.Spec):
+            class Other(store.Command):
                 two = dictobj.Field(sb.string_spec, wrapper=sb.required)
 
             @store.command("stuff", path="/v2")
-            class Stuff(dictobj.Spec):
+            class Stuff(store.Command):
                 three = dictobj.Field(sb.overridden("{wat}"), formatted=True)
 
             thing = store.command_spec.normalise(meta
@@ -304,15 +304,15 @@ describe TestCase, "Store":
                     )
 
             @store.command("thing")
-            class Thing(dictobj.Spec):
+            class Thing(store.Command):
                 pass
 
             @store.command("other")
-            class Other(dictobj.Spec):
+            class Other(store.Command):
                 pass
 
             @store.command("stuff", path="/v2")
-            class Stuff(dictobj.Spec):
+            class Stuff(store.Command):
                 pass
 
             try:
