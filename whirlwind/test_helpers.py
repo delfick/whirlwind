@@ -4,7 +4,6 @@ from tornado.httpclient import AsyncHTTPClient
 from input_algorithms import spec_base as sb
 from contextlib import contextmanager
 from functools import partial
-import http.client
 import logging
 import asyncio
 import socket
