@@ -1,8 +1,8 @@
 # coding: spec
 
 from whirlwind.request_handlers.base import SimpleWebSocketBase, Finished, MessageFromExc
+from whirlwind.server import Server, wait_for_futures
 from whirlwind import test_helpers as thp
-from whirlwind.server import Server
 
 from contextlib import contextmanager
 from unittest import mock
@@ -33,12 +33,7 @@ class WSServer(thp.ServerRunner):
         super().__init__(self.final_future, thp.free_port(), self.server, None)
 
     async def after_close(self):
-        for t in list(self.wsconnections.values()):
-            if not t.done():
-                try:
-                    await t
-                except:
-                    pass
+        await wait_for_futures(self.wsconnections)
 
 describe thp.AsyncTestCase, "SimpleWebSocketBase":
     async it "modifies ws_connection object":

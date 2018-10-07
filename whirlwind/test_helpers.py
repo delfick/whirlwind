@@ -1,5 +1,6 @@
 from asynctest import TestCase as AsyncTestCase
 from tornado.websocket import websocket_connect
+from tornado.httpclient import AsyncHTTPClient
 from input_algorithms import spec_base as sb
 from contextlib import contextmanager
 from functools import partial
@@ -83,8 +84,8 @@ class WSStream:
                 raise
 
     async def start(self, path, body):
-        self.msg_id = str(uuid.uuid1())
-        await self.server.ws_write(self.connection, {"path": path, "body": body, "message_id": self.msg_id})
+        self.message_id = str(uuid.uuid1())
+        await self.server.ws_write(self.connection, {"path": path, "body": body, "message_id": self.message_id})
 
     async def check_reply(self, reply):
         d, nd = await asyncio.wait([self.server.ws_read(self.connection)], timeout=5)
@@ -92,7 +93,7 @@ class WSStream:
             assert False, "Timedout waiting for future"
 
         got = await list(d)[0]
-        wanted = {"message_id": self.msg_id, "reply": reply}
+        wanted = {"message_id": self.message_id, "reply": reply}
         if got != wanted:
             print("got --->")
             print(got)
@@ -118,11 +119,6 @@ class ServerRunner:
         self.server_args = args
         self.server_kwargs = kwargs
 
-        self.setup()
-
-    def setup(self):
-        pass
-
     def test_start(self):
         """Hook called at the start of each test from ModuleLevelServer"""
 
@@ -135,8 +131,11 @@ class ServerRunner:
     async def after_close(self):
         """Hook called when this server is closed"""
 
+    def ws_stream(self, test):
+        return WSStream(self, test)
+
     async def after_open(self, connection):
-        """Hook called when this server is setarted"""
+        """Hook called when this server is started"""
         class ATime:
             def __eq__(self, other):
                 return type(other) is float
@@ -207,33 +206,36 @@ class ServerRunner:
             return res
         return json.loads(res)
 
-class PutTestMixin:
-    async def assertPUT(self, path, port, body, status=200, json_output=None, text_output=None, timeout=None):
-        def doit():
-            conn = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout)
-            conn.request("PUT", path, body=json.dumps(body).encode())
-            res = conn.getresponse()
+    async def assertPUT(self, test, path, body, status=200, json_output=None, text_output=None, timeout=None):
+        client = AsyncHTTPClient()
 
-            output = res.read()
+        response = await client.fetch(f"http://127.0.0.1:{self.port}{path}"
+            , method="PUT"
+            , body=json.dumps(body).encode()
+            , raise_error=False
+            )
 
-            self.assertEqual(res.status, status, output)
-            if json_output is None and text_output is None:
-                return output
+        output = response.body
+        test.assertEqual(response.code, status, output)
+
+        if json_output is None and text_output is None:
+            return output
+        else:
+            if json_output is not None:
+                self.maxDiff = None
+                try:
+                    test.assertEqual(json.loads(output.decode()), json_output)
+                except AssertionError:
+                    print(json.dumps(json.loads(output.decode()), sort_keys=True, indent="    "))
+                    raise
             else:
-                if json_output is not None:
-                    self.maxDiff = None
-                    try:
-                        self.assertEqual(json.loads(output.decode()), json_output)
-                    except AssertionError:
-                        print(json.dumps(json.loads(output.decode()), sort_keys=True, indent="    "))
-                        raise
-                else:
-                    self.assertEqual(output, text_output)
+                test.assertEqual(output, text_output)
 
-        try:
-            return await asyncio.wait_for(self.loop.run_in_executor(None, doit), timeout=timeout)
-        except asyncio.TimeoutError as error:
-            assert False, f"Failed to wait for future before timeout: {error}"
+def with_timeout(func):
+    async def test(s):
+        await s.wait_for(func(s))
+    test.__name__ = func.__name__
+    return test
 
 class ModuleLevelServer:
     def __init__(self):

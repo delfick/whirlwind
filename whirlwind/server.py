@@ -31,3 +31,16 @@ class Server(object):
 
     def tornado_routes(self):
         raise NotImplementedError()
+
+async def wait_for_futures(futures):
+    """
+    Helper for waiting on futures in a dictionary of {key: future}
+
+    Useful for waiting on the wsconnections object given to a WSHandler
+    """
+    for t in list(futures.values()):
+        if not t.done():
+            try:
+                await t
+            except:
+                pass

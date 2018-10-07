@@ -6,7 +6,7 @@ import inspect
 log = logging.getLogger("whirlwind.request_handlers.command")
 
 class ProgressMessageMaker:
-    def __init__(self, stack_level):
+    def __init__(self, stack_level=0):
         frm = inspect.stack()[1 + stack_level]
         mod = inspect.getmodule(frm[0])
         self.logger_name = mod.__name__
@@ -47,9 +47,9 @@ class ProcessReplyMixin:
             log.exception(error)
 
 class CommandHandler(Simple, ProcessReplyMixin):
-    def initialize(self, commander, progress_maker):
+    def initialize(self, commander, progress_maker=None):
         self.commander = commander
-        self.progress_maker = progress_maker
+        self.progress_maker = progress_maker or ProgressMessageMaker
 
     async def do_put(self):
         j = self.body_as_json()
@@ -59,12 +59,16 @@ class CommandHandler(Simple, ProcessReplyMixin):
             info = maker(j, message, **kwargs)
             self.process_reply(info)
 
-        return await self.commander.execute(self.request.path, j, progress_cb, self)
+        path = self.request.path
+        while path and path.endswith("/"):
+            path = path[:-1]
+
+        return await self.commander.execute(path, j, progress_cb, self)
 
 class WSHandler(SimpleWebSocketBase, ProcessReplyMixin):
-    def initialize(self, server_time, wsconnections, commander, progress_maker):
+    def initialize(self, server_time, wsconnections, commander, progress_maker=None):
         self.commander = commander
-        self.progress_maker = progress_maker
+        self.progress_maker = progress_maker or ProgressMessageMaker
         super().initialize(server_time, wsconnections)
 
     async def process_message(self, path, body, message_id, progress_cb):
