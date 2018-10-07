@@ -118,13 +118,16 @@ class ServerRunner:
         self.server_args = args
         self.server_kwargs = kwargs
 
-    def test_start(self):
+    async def before_start(self):
+        """Hook called before the server has started"""
+
+    async def started_test(self):
         """Hook called at the start of each test from ModuleLevelServer"""
 
-    def test_exception(self, exc_type, exc, tb):
+    async def exception_from_test(self, exc_type, exc, tb):
         """Hook called for each test that fails with an exception from ModuleLevelServer"""
 
-    def test_final(self):
+    async def finished_test(self):
         """Hook called after every test regardless of failure from ModuleLevelServer"""
 
     async def after_close(self):
@@ -149,6 +152,8 @@ class ServerRunner:
         await self.close(typ, exc, tb)
 
     async def start(self):
+        await self.before_start()
+
         async def doit():
             with self.wrapper:
                 await self.server.serve("127.0.0.1", self.port, *self.server_args, **self.server_kwargs)
@@ -255,7 +260,7 @@ class ModuleLevelServer:
 
     async def run_test(self, func):
         """Hook to override if you want to pass in things to the test itself"""
-        return await func()
+        return await func(self.server)
 
     def setUp(self):
         asyncio.set_event_loop(self.loop)
@@ -269,15 +274,15 @@ class ModuleLevelServer:
 
     def test(self, func):
         async def test(s):
-            self.server.test_start()
+            await self.server.started_test()
             s.maxDiff = None
             try:
                 await s.wait_for(self.run_test(partial(func, s)), timeout=10)
             except:
-                self.server.test_exception(*sys.exc_info())
+                await self.server.exception_from_test(*sys.exc_info())
                 raise
             finally:
-                self.server.test_final()
+                await self.server.finished_test()
 
         test.__name__ = func.__name__
         return test
