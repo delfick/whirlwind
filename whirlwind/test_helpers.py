@@ -278,7 +278,6 @@ class ModuleLevelServer:
                 self.server.test_exception(*sys.exc_info())
                 raise
             finally:
-                # Make sure the test is aware of all the records that test produces
                 self.server.test_final()
 
         test.__name__ = func.__name__
