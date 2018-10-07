@@ -118,6 +118,14 @@ class ServerRunner:
         self.server_args = args
         self.server_kwargs = kwargs
 
+    async def closer(self):
+        d, nd = await asyncio.wait([self.close(None, None, None)], timeout=5)
+
+        if d:
+            await list(d)[0]
+        else:
+            assert False, "Failed to shutdown the server"
+
     async def before_start(self):
         """Hook called before the server has started"""
 

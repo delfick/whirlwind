@@ -46,7 +46,7 @@ class ServerRunner(thp.ServerRunner):
         self.num_tests += 1
 
     async def after_close(self):
-        assert self.num_tests == 3
+        assert self.num_tests == 2
 
 class Runner(thp.ModuleLevelServer):
     async def server_runner(self):
@@ -67,12 +67,8 @@ class Runner(thp.ModuleLevelServer):
         await server.start()
 
         async def closer():
-            _, nd = await asyncio.wait([server.close(None, None, None)], timeout=5)
-            self.closed = True
             await wait_for_futures(wsconnections)
-
-            if nd:
-                assert False, "Failed to shutdown the server"
+            await server.closer()
 
         return server, closer
 
