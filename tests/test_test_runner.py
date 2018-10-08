@@ -23,7 +23,7 @@ class Meh(store.Command):
 
 class Server(Server):
     async def setup(self, wsconnections, server_time):
-        self.commander = Commander(store.command_spec)
+        self.commander = Commander(store)
         self.server_time = server_time
         self.wsconnections = wsconnections
 

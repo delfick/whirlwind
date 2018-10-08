@@ -13,8 +13,8 @@ class Commander:
     """
     _merged_options_formattable = True
 
-    def __init__(self, command_spec, **options):
-        self.command_spec = command_spec
+    def __init__(self, store, **options):
+        self.store = store
 
         everything = MergedOptions.using(
               options
@@ -39,6 +39,12 @@ class Commander:
         __init__ options
             Anything that is provided to the Commander at __init__
 
+        store
+            The store of commands
+
+        path
+            The path that was passed in
+
         progress_cb
             A callback that takes in a message. This is provided by whatever
             calls execute. It should take a single variable.
@@ -55,7 +61,9 @@ class Commander:
         try:
             everything = MergedOptions.using(
                   self.meta.everything
-                , { "progress_cb": progress_cb
+                , { "path": path
+                  , "store": self.store
+                  , "progress_cb": progress_cb
                   , "request_future": request_future
                   , "request_handler": request_handler
                   }
@@ -64,7 +72,7 @@ class Commander:
                 )
 
             meta = Meta(everything, self.meta.path).at("<input>")
-            command = self.command_spec.normalise(meta, {"path": path, "body": body})
+            command = self.store.command_spec.normalise(meta, {"path": path, "body": body})
 
             return await command.execute()
         finally:

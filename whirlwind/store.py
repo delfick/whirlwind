@@ -13,6 +13,8 @@ class NoSuchPath(Exception):
 class Store:
     Command = Command
 
+    _merged_options_formattable = True
+
     def __init__(self, prefix=None, default_path="/v1", formatter=None):
         self.prefix = self.normalise_prefix(prefix)
         self.formatter = formatter

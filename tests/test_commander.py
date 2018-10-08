@@ -21,6 +21,7 @@ store = Store(default_path="/v1", formatter=Formatter)
 
 @store.command("thing")
 class Thing(store.Command):
+    path = store.injected("path")
     other = store.injected("other")
     commander = store.injected("commander")
     progress_cb = store.injected("progress_cb")
@@ -28,6 +29,8 @@ class Thing(store.Command):
     request_handler = store.injected("request_handler")
 
     value = dictobj.Field(sb.string_spec, wrapper=sb.required)
+
+    store = store.injected("store")
 
     async def execute(self):
         assert not self.request_future.done()
@@ -39,7 +42,7 @@ describe thp.AsyncTestCase, "Commander":
         other = mock.Mock(name="other")
         progress_cb = mock.Mock(name="progress_cb")
         request_handler = mock.Mock(name="request_handler")
-        commander = Commander(store.command_spec, other=other)
+        commander = Commander(store, other=other)
 
         value = str(uuid.uuid1())
         thing, val = await commander.execute(
@@ -55,16 +58,20 @@ describe thp.AsyncTestCase, "Commander":
         self.assertIs(thing.commander, commander)
         self.assertIs(thing.progress_cb, progress_cb)
         self.assertIs(thing.request_handler, request_handler)
+        self.assertEqual(thing.path, "/v1")
+        self.assertIs(thing.store, store)
 
         assert thing.request_future.done()
 
     @thp.with_timeout
     async it "can override values":
+        store2 = store.clone()
+
         other1 = mock.Mock(name="other")
         other2 = mock.Mock(name="other2")
         progress_cb = mock.Mock(name="progress_cb")
         request_handler = mock.Mock(name="request_handler")
-        commander = Commander(store.command_spec, other=other1)
+        commander = Commander(store2, other=other1)
 
         value = str(uuid.uuid1())
         thing, val = await commander.execute(
@@ -77,6 +84,8 @@ describe thp.AsyncTestCase, "Commander":
 
         self.assertEqual(val, value)
         self.assertIs(thing.other, other2)
+        self.assertIs(thing.store, store2)
+        self.assertIsNot(store, store2)
 
     @thp.with_timeout
     async it "can inject values that are dictobj's":
@@ -86,7 +95,7 @@ describe thp.AsyncTestCase, "Commander":
         other = Other("twenty")
         progress_cb = mock.Mock(name="progress_cb")
         request_handler = mock.Mock(name="request_handler")
-        commander = Commander(store.command_spec, other=other)
+        commander = Commander(store, other=other)
 
         value = str(uuid.uuid1())
         thing, val = await commander.execute(
