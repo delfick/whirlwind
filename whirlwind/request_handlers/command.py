@@ -48,9 +48,10 @@ class ProcessReplyMixin:
             log.exception(error)
 
 class CommandHandler(Simple, ProcessReplyMixin):
-    def initialize(self, commander, progress_maker=None):
+    progress_maker = ProgressMessageMaker
+
+    def initialize(self, commander):
         self.commander = commander
-        self.progress_maker = progress_maker or ProgressMessageMaker
 
     async def do_put(self):
         j = self.body_as_json()
@@ -70,9 +71,10 @@ class CommandHandler(Simple, ProcessReplyMixin):
             raise Finished(status=404, wanted=error.wanted, available=error.available, error="Specified path is invalid")
 
 class WSHandler(SimpleWebSocketBase, ProcessReplyMixin):
-    def initialize(self, server_time, wsconnections, commander, progress_maker=None):
+    progress_maker = ProgressMessageMaker
+
+    def initialize(self, server_time, wsconnections, commander):
         self.commander = commander
-        self.progress_maker = progress_maker or ProgressMessageMaker
         super().initialize(server_time, wsconnections)
 
     async def process_message(self, path, body, message_id, progress_cb):
