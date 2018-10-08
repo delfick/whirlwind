@@ -114,7 +114,9 @@ class ServerRunner:
         self.server = server
         self.wrapper = wrapper
         self.final_future = final_future
+        self.setup(*args, **kwargs)
 
+    def setup(self, *args, **kwargs):
         self.server_args = args
         self.server_kwargs = kwargs
 
@@ -250,13 +252,13 @@ def with_timeout(func):
     return test
 
 class ModuleLevelServer:
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self.loop = asyncio.new_event_loop()
-        self.server = None
-        self.closer = None
-        self.record_lines_read = 0
 
-    async def server_runner(self):
+        self.args = args
+        self.kwargs = kwargs
+
+    async def server_runner(self, *args, **kwargs):
         """
         Hook to create a ServerRunner
 
@@ -272,7 +274,7 @@ class ModuleLevelServer:
 
     def setUp(self):
         asyncio.set_event_loop(self.loop)
-        self.server, self.closer = self.loop.run_until_complete(self.server_runner())
+        self.server, self.closer = self.loop.run_until_complete(self.server_runner(*self.args, **self.kwargs))
 
     def tearDown(self):
         if self.closer is not None:
