@@ -1,4 +1,5 @@
-from whirlwind.request_handlers.base import Simple, SimpleWebSocketBase
+from whirlwind.request_handlers.base import Simple, SimpleWebSocketBase, Finished
+from whirlwind.store import NoSuchPath
 
 import logging
 import inspect
@@ -63,7 +64,10 @@ class CommandHandler(Simple, ProcessReplyMixin):
         while path and path.endswith("/"):
             path = path[:-1]
 
-        return await self.commander.execute(path, j, progress_cb, self)
+        try:
+            return await self.commander.execute(path, j, progress_cb, self)
+        except NoSuchPath as error:
+            raise Finished(status=404, wanted=error.wanted, available=error.available, error="Specified path is invalid")
 
 class WSHandler(SimpleWebSocketBase, ProcessReplyMixin):
     def initialize(self, server_time, wsconnections, commander, progress_maker=None):
@@ -77,4 +81,7 @@ class WSHandler(SimpleWebSocketBase, ProcessReplyMixin):
             info = maker(body, message, **kwargs)
             progress_cb(info)
 
-        return await self.commander.execute(path, body, pcb, self)
+        try:
+            return await self.commander.execute(path, body, pcb, self)
+        except NoSuchPath as error:
+            raise Finished(status=404, wanted=error.wanted, available=error.available, error="Specified path is invalid")

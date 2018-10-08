@@ -5,6 +5,11 @@ from input_algorithms.dictobj import dictobj
 from input_algorithms import spec_base as sb
 from collections import defaultdict
 
+class NoSuchPath(Exception):
+    def __init__(self, wanted, available):
+        self.wanted = wanted
+        self.available = available
+
 class Store:
     Command = Command
 
@@ -73,24 +78,24 @@ class Store:
             the Command instance.
             """
             def normalise_filled(s, meta, val):
-                val = sb.set_options(
+                v = sb.set_options(
                       path = sb.required(sb.string_spec())
-                    , body = sb.required(sb.set_options(
+                    ).normalise(meta, val)
+
+                path = v["path"]
+
+                if path not in self.paths:
+                    raise NoSuchPath(path, sorted(self.paths))
+
+                val = sb.set_options(
+                      body = sb.required(sb.set_options(
                         args = sb.dictionary_spec()
                       , command = sb.required(sb.string_spec())
                       ))
                     ).normalise(meta, val)
 
-                path = val["path"]
                 args = val["body"]["args"]
                 name = val["body"]["command"]
-
-                if path not in self.paths:
-                    raise BadSpecValue("Unknown path"
-                        , wanted=path
-                        , available=sorted(self.paths)
-                        , meta=meta.at("path")
-                        )
 
                 available_commands = self.paths[path]
 

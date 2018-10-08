@@ -4,6 +4,7 @@ from whirlwind.request_handlers.command import WSHandler, CommandHandler
 from whirlwind.server import Server, wait_for_futures
 from whirlwind import test_helpers as thp
 from whirlwind.commander import Command
+from whirlwind.store import NoSuchPath
 
 from functools import partial
 from unittest import mock
@@ -27,6 +28,10 @@ class Runner(thp.ServerRunner):
                         }
                       )
                     , ( "/v1/somewhere"
+                      , CommandHandler
+                      , {"commander": commander}
+                      )
+                    , ( "/v1/other"
                       , CommandHandler
                       , {"commander": commander}
                       )
@@ -71,3 +76,18 @@ describe thp.AsyncTestCase, "WSHandler and CommandHandler":
             await server.assertPUT(self, "/v1/somewhere", {"command": "one"}, json_output={"success": True})
 
         commander.execute.assert_called_once_with("/v1/somewhere", {"command": "one"}, mock.ANY, mock.ANY)
+
+    @thp.with_timeout
+    async it "raises 404 if the path is invalid":
+        commander = self.make_commander(CommandHandler)
+        commander.execute.side_effect = NoSuchPath(wanted="/v1/other", available=["/v1/somewhere"])
+
+        async with Runner(commander) as server:
+            await server.assertPUT(self, "/v1/other", {"command": "one"}
+                , status = 404
+                , json_output = {"status": 404, "error": "Specified path is invalid", "wanted": "/v1/other", "available": ["/v1/somewhere"]}
+                )
+
+            async with server.ws_stream(self) as stream:
+                await stream.start("/v1/other", {"command": "one"})
+                await stream.check_reply({"status": 404, "error": "Specified path is invalid", "wanted": "/v1/other", "available": ["/v1/somewhere"]})

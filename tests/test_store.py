@@ -1,6 +1,6 @@
 # coding: spec
 
-from whirlwind.store import Store
+from whirlwind.store import Store, NoSuchPath
 
 from option_merge.formatter import MergedOptionStringFormatter
 from input_algorithms.errors import BadSpecValue
@@ -294,14 +294,9 @@ describe TestCase, "Store":
             try:
                 store.command_spec.normalise(meta, {"path": "/somewhere", "body": {"command": "thing"}})
                 assert False, "Expected an error"
-            except BadSpecValue as error:
-                self.assertEqual(error.as_dict()
-                    , { "message": "Bad value. Unknown path"
-                      , "wanted": "/somewhere"
-                      , "available": []
-                      , "meta": meta.at("path").delfick_error_format("meta")
-                      }
-                    )
+            except NoSuchPath as error:
+                self.assertEqual(error.wanted, "/somewhere")
+                self.assertEqual(error.available, [])
 
             @store.command("thing")
             class Thing(store.Command):
@@ -318,14 +313,9 @@ describe TestCase, "Store":
             try:
                 store.command_spec.normalise(meta, {"path": "/somewhere", "body": {"command": "thing"}})
                 assert False, "Expected an error"
-            except BadSpecValue as error:
-                self.assertEqual(error.as_dict()
-                    , { "message": "Bad value. Unknown path"
-                      , "wanted": "/somewhere"
-                      , "available": ["/v1", "/v2"]
-                      , "meta": meta.at("path").delfick_error_format("meta")
-                      }
-                    )
+            except NoSuchPath as error:
+                self.assertEqual(error.wanted, "/somewhere")
+                self.assertEqual(error.available, ["/v1", "/v2"])
 
             try:
                 store.command_spec.normalise(meta, {"path": "/v1", "body": {"command": "missing"}})
