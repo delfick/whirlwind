@@ -21,6 +21,12 @@ class Store:
         self.default_path = default_path
         self.paths = defaultdict(dict)
 
+    def clone(self):
+        new_store = Store(self.prefix, self.default_path, self.formatter)
+        for path, commands in self.paths.items():
+            new_store.paths[path].update(dict(commands))
+        return new_store
+
     def injected(self, path):
         return dictobj.Field(sb.overridden(f"{{{path}}}"), formatted=True)
 

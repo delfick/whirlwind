@@ -35,6 +35,32 @@ describe TestCase, "Store":
         store = Store(prefix="/somewhere/nice")
         self.assertEqual(store.prefix, "/somewhere/nice/")
 
+    describe "clone":
+        it "copies everything":
+            one = mock.Mock(name="one")
+            two = mock.Mock(name="two")
+            three = mock.Mock(name="three")
+
+            formatter = mock.Mock(name="formatter")
+
+            store = Store(prefix="stuff", default_path="/v1/blah", formatter=formatter)
+            store.paths["/v1"]["blah"] = one
+
+            store2 = store.clone()
+            self.assertEqual(store2.prefix, "stuff/")
+            self.assertEqual(store2.default_path, "/v1/blah")
+            self.assertIs(store2.formatter, formatter)
+
+            self.assertEqual(dict(store2.paths), {"/v1": {"blah": one}})
+
+            store2.paths["/v1"]["meh"] = two
+            self.assertEqual(dict(store2.paths), {"/v1": {"blah": one, "meh": two}})
+            self.assertEqual(dict(store.paths), {"/v1": {"blah": one}})
+
+            store2.paths["/v2"]["stuff"] = three
+            self.assertEqual(dict(store2.paths), {"/v2": {"stuff": three}, "/v1": {"blah": one, "meh": two}})
+            self.assertEqual(dict(store.paths), {"/v1": {"blah": one}})
+
     describe "normalise_prefix":
         it "says None is an empty string":
             store = Store()
