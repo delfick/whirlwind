@@ -45,7 +45,7 @@ class ServerRunner(thp.ServerRunner):
     async def started_test(self):
         self.num_tests += 1
 
-    async def after_close(self):
+    async def after_close(self, typ, exc, tb):
         assert self.num_tests == 2
 
 class Runner(thp.ModuleLevelServer):

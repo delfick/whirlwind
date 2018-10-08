@@ -138,7 +138,7 @@ class ServerRunner:
     async def finished_test(self):
         """Hook called after every test regardless of failure from ModuleLevelServer"""
 
-    async def after_close(self):
+    async def after_close(self, exc_type, exc, tb):
         """Hook called when this server is closed"""
 
     def ws_stream(self, test):
@@ -190,7 +190,7 @@ class ServerRunner:
             except asyncio.CancelledError:
                 pass
 
-        await asyncio.wait_for(self.after_close(), timeout=5)
+        await asyncio.wait_for(self.after_close(typ, exc, tb), timeout=5)
 
         assert not port_connected(self.port)
 

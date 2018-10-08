@@ -32,7 +32,7 @@ class WSServer(thp.ServerRunner):
         self.server = WSS(self.final_future)
         super().__init__(self.final_future, thp.free_port(), self.server, None)
 
-    async def after_close(self):
+    async def after_close(self, exc_type, exc, tb):
         await wait_for_futures(self.wsconnections)
 
 describe thp.AsyncTestCase, "SimpleWebSocketBase":
