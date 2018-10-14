@@ -220,13 +220,50 @@ class ServerRunner:
             return res
         return json.loads(res)
 
+    async def assertGET(self, test, path, status=200, json_output=None, text_output=None):
+        return await self.assertHTTP(test, path, "GET", {}
+            , status = status
+            , json_output = json_output
+            , text_output = text_output
+            )
+
+    async def assertPOST(self, test, path, body, status=200, json_output=None, text_output=None):
+        return await self.assertHTTP(test, path, "POST", {"body": json.dumps(body).encode()}
+            , status = status
+            , json_output = json_output
+            , text_output = text_output
+            )
+
     async def assertPUT(self, test, path, body, status=200, json_output=None, text_output=None):
+        return await self.assertHTTP(test, path, "PUT", {"body": json.dumps(body).encode()}
+            , status = status
+            , json_output = json_output
+            , text_output = text_output
+            )
+
+    async def assertPATCH(self, test, path, body, status=200, json_output=None, text_output=None):
+        return await self.assertHTTP(test, path, "PATCH", {"body": json.dumps(body).encode()}
+            , status = status
+            , json_output = json_output
+            , text_output = text_output
+            )
+
+    async def assertDELETE(self, test, path, status=200, json_output=None, text_output=None):
+        return await self.assertHTT(test, path, "DELETE", {}
+            , status = status
+            , json_output = json_output
+            , text_output = text_output
+            )
+
+    async def assertHTTP(self, test, path, method, kwargs, status=200, json_output=None, text_output=None):
         client = AsyncHTTPClient()
 
+        if "raise_error" not in kwargs:
+            kwargs['raise_error'] = False
+
         response = await client.fetch(f"http://127.0.0.1:{self.port}{path}"
-            , method="PUT"
-            , body=json.dumps(body).encode()
-            , raise_error=False
+            , method = method
+            , **kwargs
             )
 
         output = response.body
