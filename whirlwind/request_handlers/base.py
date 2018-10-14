@@ -330,6 +330,7 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
             path = msg.path
             body = msg.body
             message_id = msg.message_id
+            message_key = str(uuid.uuid4())
 
             if path == "__tick__":
                 self.reply({"ok": "thankyou"}, message_id=message_id)
@@ -348,11 +349,11 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
 
                 progress_cb = lambda progress: self.reply({"progress": progress}, message_id=message_id)
                 async with self.async_catcher(info, on_processed):
-                    info["result"] = await self.process_message(path, body, message_id, progress_cb)
+                    info["result"] = await self.process_message(path, body, message_id, message_key, progress_cb)
 
             def done(res):
-                if self.key in self.wsconnections:
-                    del self.wsconnections[self.key]
+                if message_key in self.wsconnections:
+                    del self.wsconnections[message_key]
 
                 if not res.cancelled():
                     exc = res.exception()
@@ -361,9 +362,9 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
 
             t = asyncio.get_event_loop().create_task(doit())
             t.add_done_callback(done)
-            self.wsconnections[self.key] = t
+            self.wsconnections[message_key] = t
 
-    async def process_message(self, path, body, message_id, progress_cb):
+    async def process_message(self, path, body, message_id, message_key, progress_cb):
         """
         Return the response to be sent back when we get a message from the conn.
 
@@ -375,6 +376,9 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
 
         message_id
             The unique message_id for this stream of requests as supplied in the request
+
+        message_key
+            A unique id for this stream created by the server
 
         progress_cb
             A callback that will send a message of the form ``{"progress": <progress>, "message_id": <message_id}``

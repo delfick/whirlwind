@@ -38,10 +38,12 @@ class WSServer(thp.ServerRunner):
 describe thp.AsyncTestCase, "SimpleWebSocketBase":
     async it "modifies ws_connection object":
         class Handler(SimpleWebSocketBase):
-            async def process_message(s, path, body, message_id, progress_cb):
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
                 self.assertEqual(type(self.key), str)
                 self.assertEqual(len(self.key), 36)
-                assert self.key in self.wsconnections
+                self.assertNotEqual(message_id, message_key)
+                self.assertNotEqual(message_key, self.key)
+                assert message_key in self.wsconnections
                 return "blah"
 
         async def doit():
@@ -64,7 +66,7 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
         f2 = asyncio.Future()
 
         class Handler(SimpleWebSocketBase):
-            async def process_message(s, path, body, message_id, progress_cb):
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
                 f1.set_result(True)
                 await asyncio.sleep(0.5)
                 f2.set_result(True)
@@ -88,10 +90,14 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
         await self.wait_for(doit())
 
     async it "can stay open":
+        message_info = {"keys": set(), "message_keys": []}
+
         class Handler(SimpleWebSocketBase):
-            async def process_message(s, path, body, message_id, progress_cb):
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
                 self.assertEqual(path, "/one/two")
                 self.assertEqual(body, {"wat": mock.ANY})
+                message_info["keys"].add(s.key)
+                message_info["message_keys"].append(message_key)
                 return body["wat"]
 
         async def doit():
@@ -118,9 +124,12 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
 
         await self.wait_for(doit())
 
+        self.assertEqual(len(message_info["keys"]), 1)
+        self.assertEqual(len(message_info["message_keys"]), len(set(message_info["message_keys"])))
+
     async it "can handle ticks for me":
         class Handler(SimpleWebSocketBase):
-            async def process_message(s, path, body, message_id, progress_cb):
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
                 self.assertEqual(path, "/one/two")
                 self.assertEqual(body, {"wat": mock.ANY})
                 return body["wat"]
@@ -151,7 +160,7 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
 
     async it "complains if the message is incorrect":
         class Handler(SimpleWebSocketBase):
-            async def process_message(s, path, body, message_id, progress_cb):
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
                 return "processed"
 
         async def doit():
@@ -191,7 +200,7 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
         class Handler(SimpleWebSocketBase):
             do_close = False
 
-            async def process_message(s, path, body, message_id, progress_cb):
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
                 progress_cb({body["serial"]: ["info", "start"]})
                 await asyncio.sleep(body["sleep"])
                 return {"processed": body["serial"]}
@@ -230,7 +239,7 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
 
     async it "can close the websocket if we return self.Closing":
         class Handler(SimpleWebSocketBase):
-            async def process_message(s, path, body, message_id, progress_cb):
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
                 if body["close"]:
                     return s.Closing
                 else:
@@ -270,7 +279,7 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
 
     async it "can handle arbitrary json for the body":
         class Handler(SimpleWebSocketBase):
-            async def process_message(s, path, body, message_id, progress_cb):
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
                 return body
 
         async def doit():
@@ -319,7 +328,7 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
 
                 self.message_from_exc = message_from_exc
 
-            async def process_message(s, path, body, message_id, progress_cb):
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
                 raise errors[body["error"]]
 
         async def doit():
@@ -367,7 +376,7 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                 return {"result": "", "value": s.value}
 
         class Handler(SimpleWebSocketBase):
-            async def process_message(s, path, body, message_id, progress_cb):
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
                 return Ret("blah and stuff")
 
         async def doit():
@@ -399,7 +408,7 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
             def process_reply(self, msg, exc_info=None):
                 replies.append((msg, exc_info))
 
-            async def process_message(s, path, body, message_id, progress_cb):
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
                 if path == "/no_error":
                     return {"success": True}
                 elif path == "/internal_error":
