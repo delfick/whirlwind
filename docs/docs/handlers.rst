@@ -148,3 +148,72 @@ If you want to keep the existing behaviour, then you can subclass the
 
   # curl /one returns a 401 response that says
   # {"status": 401, "error_code": "WhoAreYou", "error": "Couldn't identify you"}
+
+Websocket Handler
+-----------------
+
+The other request handler type is the ``SimpleWebSocketBase`` which lets you
+create a websocket handler. For example:
+
+.. code-block:: python
+
+  from whirlwind.request_handlers.base import SimpleWebSocketBase
+  from whirlwind.server import wait_for_futures, Server
+
+  import time
+
+  class WSHandler(SimpleWebSocketBase):
+      async def process_message(self, path, body, message_id, message_key, progress_cb):
+          progress_cb({"called_path": path, "called_body": body})
+          return {"success": True}
+
+  class Server(Server):
+      async def setup(self):
+          self.wsconnections = {}
+
+      def tornado_routes(self):
+          return [
+                ( "/ws"
+                , WSHandler
+                , {"server_time": time.time(), "wsconnections": self.wsconnections}
+                )
+              ]
+
+      async def cleanup(self):
+          # Wait for our websockets to finish
+          await wait_for_futures(self.wsconnections)
+
+  # Opening the websocket stream to /ws will get us back this message
+  # {"reply": <the server_time>, "message_id": "__server_time__"}
+
+  # Then when we send the message {"path": "/somewhere, "body": {"something": True}, "message_id": "message1"}
+  # We get back the following two messages
+  # {"message_id": "message1", "reply": {"progress": {"called_path": "/somewhere", "called_body": {"something": True}}}
+  # {"message_id": "message1", "reply": {"success": True}}
+
+Everything about how the replies and exceptions are treated (and the reprer and
+message_from_exc functions) are the same for the websocket handler.
+
+The handler is opinionated however and will complain if your messages are not of
+the form ``{"path": <string>, "body": <value>, "message_id": <string>}``. Also
+all replies are of the form ``{"message_id": <message_id from request>, "reply": <object>}``
+
+When you call the ``progress_cb`` callback the reply will be of the form
+``{"message_id": <message_id_from-request>, "reply": {"progress": <object given to progress_cb}}``
+
+Also, the Websocket handler takes in ``server_time`` and ``wsconnections`` as
+parameters. The ``server_time`` is used to tell the client the time at which the
+server was started. This is so the client can determine if the server was changed
+since the last time it started a websocket stream with the server.
+
+The ``wsconnections`` object is used to store the asyncio tasks that are created
+for each websocket message that is received. It is up to you to wait on these
+tasks when the server is finished to ensure they finish cleanly. The ``wait_for_futures``
+helper does just this, as shown in the example. The handler will create a unique
+uuid for every message it receives and use that as the key in ``wsconnections``.
+This unique uuid is passed into ``process_message`` as ``message_key``.
+
+The other thing that this handler will do for you is handle any message of the
+form ``{"path": "__tick__", "message_id": "__tick__"}`` with the reply of
+``{"message_id": "__tick__", "reply": {"ok": "thankyou"}}``. This is so clients
+can keep the connection alive by sending such messages every so often.
