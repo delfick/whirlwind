@@ -47,7 +47,7 @@ describe thp.AsyncTestCase, "WSHandler and CommandHandler":
     def make_commander(self, handlerKls):
         commander = mock.Mock(name="commander")
 
-        def execute(path, body, progress_cb, request_handler):
+        def execute(path, body, progress_cb, request_handler, extra_options=None):
             self.assertIsInstance(request_handler, handlerKls)
             progress_cb("information", one=1)
             progress_cb(ValueError("NOPE"))
@@ -59,14 +59,19 @@ describe thp.AsyncTestCase, "WSHandler and CommandHandler":
     async it "WSHandler calls out to commander.execute":
         commander = self.make_commander(WSHandler)
 
+        message_id = None
+
         async with Runner(commander) as server:
             async with server.ws_stream(self) as stream:
                 await stream.start("/v1/somewhere", {"command": "one"})
+                message_id = stream.message_id
                 await stream.check_reply({'progress': {'info': "information", "one": 1}})
                 await stream.check_reply({'progress': {'error': "NOPE", "error_code": "ValueError"}})
                 await stream.check_reply({"success": True})
 
-        commander.execute.assert_called_once_with("/v1/somewhere", {"command": "one"}, mock.ANY, mock.ANY)
+        commander.execute.assert_called_once_with("/v1/somewhere", {"command": "one"}, mock.ANY, mock.ANY
+            , extra_options = {"message_id": message_id, "message_key": mock.ANY}
+            )
 
     @thp.with_timeout
     async it "CommandHandler calls out to commander.execute":
