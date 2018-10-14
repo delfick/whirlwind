@@ -2,6 +2,7 @@
     :hidden:
 
     docs/server
+    docs/handlers
 
 .. _whirlwind:
 
