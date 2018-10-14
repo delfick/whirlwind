@@ -146,8 +146,8 @@ class ServerRunner:
     def ws_stream(self, test):
         return WSStream(self, test)
 
-    async def after_open(self, connection):
-        """Hook called when this server is started"""
+    async def after_ws_open(self, connection):
+        """Hook called when a websocket connection is made"""
         class ATime:
             def __eq__(self, other):
                 return type(other) is float
@@ -207,7 +207,7 @@ class ServerRunner:
     async def ws_connect(self):
         connection = await websocket_connect(self.ws_url)
 
-        await self.after_open(connection)
+        await self.after_ws_open(connection)
 
         return connection
 
