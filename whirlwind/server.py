@@ -26,7 +26,10 @@ class Server(object):
         except ForcedQuit:
             log.info("The server was told to shut down")
         finally:
-            http_server.stop()
+            try:
+                http_server.stop()
+            finally:
+                await self.cleanup()
 
     async def setup(self, *args, **kwargs):
         """
@@ -41,6 +44,9 @@ class Server(object):
         Must be implemented to provide the list of routes given to the tornado.web.Application
         """
         raise NotImplementedError()
+
+    async def cleanup(self):
+        """Called after the server has stopped"""
 
 async def wait_for_futures(futures):
     """

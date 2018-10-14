@@ -57,12 +57,14 @@ describe thp.AsyncTestCase, "setup":
             self.FakeApplication = mock.Mock(name="Application", return_value=self.application)
 
             self.setup = asynctest.mock.CoroutineMock(name="setup", return_value=setup_return)
+            self.cleanup = asynctest.mock.CoroutineMock(name="cleanup")
             self.tornado_routes = mock.Mock(name="tornado_routes", return_value=self.routes)
 
             self.patchHTTPServer = mock.patch("whirlwind.server.HTTPServer", self.FakeHTTPServer)
             self.patchApplication = mock.patch("tornado.web.Application", self.FakeApplication)
 
             self.patch_setup = mock.patch.object(Server, "setup", self.setup)
+            self.patch_cleanup = mock.patch.object(Server, "cleanup", self.cleanup)
             self.patch_tornado_routes = mock.patch.object(Server, "tornado_routes", self.tornado_routes)
 
             self.final_future = asyncio.Future()
@@ -71,6 +73,7 @@ describe thp.AsyncTestCase, "setup":
             self.patchHTTPServer.start()
             self.patchApplication.start()
             self.patch_setup.start()
+            self.patch_cleanup.start()
             self.patch_tornado_routes.start()
 
             server = Server(self.final_future)
@@ -94,7 +97,9 @@ describe thp.AsyncTestCase, "setup":
                 await asyncio.sleep(0.1)
 
                 self.http_server.stop.assert_called_once_with()
+                self.cleanup.assert_called_once_with()
             finally:
+                self.patch_cleanup.stop()
                 if not self.final_future.done():
                     self.final_future.cancel()
 
