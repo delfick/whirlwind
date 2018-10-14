@@ -220,7 +220,7 @@ class ServerRunner:
             return res
         return json.loads(res)
 
-    async def assertPUT(self, test, path, body, status=200, json_output=None, text_output=None, timeout=None):
+    async def assertPUT(self, test, path, body, status=200, json_output=None, text_output=None):
         client = AsyncHTTPClient()
 
         response = await client.fetch(f"http://127.0.0.1:{self.port}{path}"
