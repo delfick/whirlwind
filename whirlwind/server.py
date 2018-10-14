@@ -12,9 +12,11 @@ class Server(object):
         self.final_future = final_future
 
     async def serve(self, host, port, *args, **kwargs):
-        await self.setup(*args, **kwargs)
+        server_kwargs = await self.setup(*args, **kwargs)
+        if server_kwargs is None:
+            server_kwargs = {}
 
-        http_server = HTTPServer(tornado.web.Application(self.tornado_routes()))
+        http_server = HTTPServer(tornado.web.Application(self.tornado_routes(), **server_kwargs))
 
         log.info(f"Hosting server at http://{host}:{port}")
 
@@ -27,9 +29,17 @@ class Server(object):
             http_server.stop()
 
     async def setup(self, *args, **kwargs):
-        pass
+        """
+        Hook that receives all extra args and kwargs from serve
+
+        The return of this function is either None or a dictionary of kwargs
+        to add to our instantiation of the tornado.web.Application.
+        """
 
     def tornado_routes(self):
+        """
+        Must be implemented to provide the list of routes given to the tornado.web.Application
+        """
         raise NotImplementedError()
 
 async def wait_for_futures(futures):
