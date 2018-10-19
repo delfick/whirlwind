@@ -131,15 +131,6 @@ class ServerRunner:
     async def before_start(self):
         """Hook called before the server has started"""
 
-    async def started_test(self):
-        """Hook called at the start of each test from ModuleLevelServer"""
-
-    async def exception_from_test(self, exc_type, exc, tb):
-        """Hook called for each test that fails with an exception from ModuleLevelServer"""
-
-    async def finished_test(self):
-        """Hook called after every test regardless of failure from ModuleLevelServer"""
-
     async def after_close(self, exc_type, exc, tb):
         """Hook called when this server is closed"""
 
@@ -319,17 +310,26 @@ class ModuleLevelServer:
         self.loop.close()
         asyncio.set_event_loop(None)
 
+    async def started_test(self):
+        """Hook called at the start of each test"""
+
+    async def exception_from_test(self, exc_type, exc, tb):
+        """Hook called for each test that fails with an exception"""
+
+    async def finished_test(self):
+        """Hook called after every test regardless of failure"""
+
     def test(self, func):
         async def test(s):
-            await self.server.started_test()
+            await self.started_test()
             s.maxDiff = None
             try:
                 await s.wait_for(self.run_test(partial(func, s)), timeout=10)
             except:
-                await self.server.exception_from_test(*sys.exc_info())
+                await self.exception_from_test(*sys.exc_info())
                 raise
             finally:
-                await self.server.finished_test()
+                await self.finished_test()
 
         test.__name__ = func.__name__
         return test

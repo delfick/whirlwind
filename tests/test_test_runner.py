@@ -42,13 +42,13 @@ class ServerRunner(thp.ServerRunner):
     async def before_start(self):
         self.num_tests = 0
 
-    async def started_test(self):
-        self.num_tests += 1
-
     async def after_close(self, typ, exc, tb):
         assert self.num_tests == 2
 
 class Runner(thp.ModuleLevelServer):
+    async def started_test(self):
+        self.server.num_tests += 1
+
     async def server_runner(self):
         self.final_future = asyncio.Future()
 
