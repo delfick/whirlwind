@@ -19,6 +19,14 @@ class Formatter(MergedOptionStringFormatter):
 
 store = Store(default_path="/v1", formatter=Formatter)
 
+@store.command("thing_caller")
+class ThingCaller(store.Command):
+    executor = store.injected("executor")
+    passon = dictobj.Field(sb.string_spec, wrapper=sb.required)
+
+    async def execute(self):
+        return await self.executor.execute("/v1", {"command": "thing", "args": {"value": f"called! {self.passon}"}})
+
 @store.command("thing")
 class Thing(store.Command):
     path = store.injected("path")
@@ -45,16 +53,39 @@ describe thp.AsyncTestCase, "Commander":
         commander = Commander(store, other=other)
 
         value = str(uuid.uuid1())
-        thing, val = await commander.execute(
+        thing, val = await commander.executor(progress_cb, request_handler).execute(
               "/v1"
             , {"command": "thing", "args": {"value": value}}
-            , progress_cb
-            , request_handler
             )
 
         self.assertEqual(val, value)
 
         self.assertIs(thing.other, other)
+        self.assertIs(thing.commander, commander)
+        self.assertIs(thing.progress_cb, progress_cb)
+        self.assertIs(thing.request_handler, request_handler)
+        self.assertEqual(thing.path, "/v1")
+        self.assertIs(thing.store, store)
+
+        assert thing.request_future.done()
+
+    @thp.with_timeout
+    async it "can be given an executor":
+        other = mock.Mock(name="other")
+        other2 = mock.Mock(name="other2")
+        progress_cb = mock.Mock(name="progress_cb")
+        request_handler = mock.Mock(name="request_handler")
+        commander = Commander(store, other=other)
+
+        value = str(uuid.uuid1())
+        thing, val = await commander.executor(progress_cb, request_handler, other=other2).execute(
+              "/v1"
+            , {"command": "thing_caller", "args": {"passon": value}}
+            )
+
+        self.assertEqual(val, f"called! {value}")
+
+        self.assertIs(thing.other, other2)
         self.assertIs(thing.commander, commander)
         self.assertIs(thing.progress_cb, progress_cb)
         self.assertIs(thing.request_handler, request_handler)
@@ -74,11 +105,9 @@ describe thp.AsyncTestCase, "Commander":
         commander = Commander(store2, other=other1)
 
         value = str(uuid.uuid1())
-        thing, val = await commander.execute(
+        thing, val = await commander.executor(progress_cb, request_handler).execute(
               "/v1"
             , {"command": "thing", "args": {"value": value}}
-            , progress_cb
-            , request_handler
             , {"other": other2}
             )
 
@@ -98,11 +127,9 @@ describe thp.AsyncTestCase, "Commander":
         commander = Commander(store, other=other)
 
         value = str(uuid.uuid1())
-        thing, val = await commander.execute(
+        thing, val = await commander.executor(progress_cb, request_handler).execute(
               "/v1"
             , {"command": "thing", "args": {"value": value}}
-            , progress_cb
-            , request_handler
             )
 
         self.assertEqual(val, value)

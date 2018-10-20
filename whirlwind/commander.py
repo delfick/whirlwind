@@ -9,7 +9,7 @@ class Command(dictobj.Spec):
 
 class Commander:
     """
-    Entry point to commands.
+    Entry point for creating an executor to execute commands with
     """
     _merged_options_formattable = True
 
@@ -27,7 +27,19 @@ class Commander:
     def process_reply(self, msg, exc_info):
         """Hook for every reply and progress message sent to the client"""
 
-    async def execute(self, path, body, progress_cb, request_handler, extra_options=None):
+    def executor(self, progress_cb, request_handler, **extra_options):
+        return Executor(self, progress_cb, request_handler, extra_options)
+
+class Executor:
+    _merged_options_formattable = True
+
+    def __init__(self, commander, progress_cb, request_handler, extra_options):
+        self.commander = commander
+        self.progress_cb = progress_cb
+        self.extra_options = extra_options
+        self.request_handler = request_handler
+
+    async def execute(self, path, body, extra_options=None):
         """
         Responsible for creating a command and calling execute on it.
 
@@ -37,7 +49,7 @@ class Commander:
         We have available on the meta object:
 
         __init__ options
-            Anything that is provided to the Commander at __init__
+            Anything that is provided to the Commander and Executor at __init__
 
         store
             The store of commands
@@ -45,9 +57,8 @@ class Commander:
         path
             The path that was passed in
 
-        progress_cb
-            A callback that takes in a message. This is provided by whatever
-            calls execute. It should take a single variable.
+        executor
+            This executor
 
         request_future
             A future that is cancelled after execute is finished
@@ -60,19 +71,21 @@ class Commander:
 
         try:
             everything = MergedOptions.using(
-                  self.meta.everything
+                  self.commander.meta.everything
                 , { "path": path
-                  , "store": self.store
-                  , "progress_cb": progress_cb
+                  , "store": self.commander.store
+                  , "executor": self
+                  , "progress_cb": self.progress_cb
                   , "request_future": request_future
-                  , "request_handler": request_handler
+                  , "request_handler": self.request_handler
                   }
+                , self.extra_options
                 , extra_options or {}
                 , dont_prefix = [dictobj]
                 )
 
-            meta = Meta(everything, self.meta.path).at("<input>")
-            command = self.store.command_spec.normalise(meta, {"path": path, "body": body})
+            meta = Meta(everything, self.commander.meta.path).at("<input>")
+            command = self.commander.store.command_spec.normalise(meta, {"path": path, "body": body})
 
             return await command.execute()
         finally:

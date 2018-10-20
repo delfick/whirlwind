@@ -66,7 +66,7 @@ class CommandHandler(Simple, ProcessReplyMixin):
             path = path[:-1]
 
         try:
-            return await self.commander.execute(path, j, progress_cb, self)
+            return await self.commander.executor(progress_cb, self).execute(path, j)
         except NoSuchPath as error:
             raise Finished(status=404, wanted=error.wanted, available=error.available, error="Specified path is invalid")
 
@@ -84,8 +84,7 @@ class WSHandler(SimpleWebSocketBase, ProcessReplyMixin):
             progress_cb(info)
 
         try:
-            return await self.commander.execute(path, body, pcb, self
-                , extra_options = {"message_key": message_key, "message_id": message_id}
-                )
+            executor = self.commander.executor(pcb, self, message_key=message_key, message_id=message_id)
+            return await executor.execute(path, body)
         except NoSuchPath as error:
             raise Finished(status=404, wanted=error.wanted, available=error.available, error="Specified path is invalid")

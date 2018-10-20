@@ -47,12 +47,18 @@ describe thp.AsyncTestCase, "WSHandler and CommandHandler":
     def make_commander(self, handlerKls):
         commander = mock.Mock(name="commander")
 
-        def execute(path, body, progress_cb, request_handler, extra_options=None):
-            self.assertIsInstance(request_handler, handlerKls)
-            progress_cb("information", one=1)
-            progress_cb(ValueError("NOPE"))
-            return {"success": True}
-        commander.execute = asynctest.mock.CoroutineMock(name="execute", side_effect=execute)
+        class Executor:
+            def __init__(s, progress_cb, request_handler, **extra):
+                s.extra = extra
+                s.progress_cb = progress_cb
+                s.request_handler = request_handler
+
+            async def execute(s, path, body, extra_options=None):
+                self.assertIsInstance(s.request_handler, handlerKls)
+                s.progress_cb("information", one=1)
+                s.progress_cb(ValueError("NOPE"))
+                return {"success": True, **s.extra}
+        commander.executor.side_effect = Executor
         return commander
 
     @thp.with_timeout
@@ -67,11 +73,7 @@ describe thp.AsyncTestCase, "WSHandler and CommandHandler":
                 message_id = stream.message_id
                 await stream.check_reply({'progress': {'info': "information", "one": 1}})
                 await stream.check_reply({'progress': {'error': "NOPE", "error_code": "ValueError"}})
-                await stream.check_reply({"success": True})
-
-        commander.execute.assert_called_once_with("/v1/somewhere", {"command": "one"}, mock.ANY, mock.ANY
-            , extra_options = {"message_id": message_id, "message_key": mock.ANY}
-            )
+                await stream.check_reply({"success": True, "message_id": message_id, "message_key": mock.ANY})
 
     @thp.with_timeout
     async it "CommandHandler calls out to commander.execute":
@@ -80,12 +82,13 @@ describe thp.AsyncTestCase, "WSHandler and CommandHandler":
         async with Runner(commander) as server:
             await server.assertPUT(self, "/v1/somewhere", {"command": "one"}, json_output={"success": True})
 
-        commander.execute.assert_called_once_with("/v1/somewhere", {"command": "one"}, mock.ANY, mock.ANY)
-
     @thp.with_timeout
     async it "raises 404 if the path is invalid":
         commander = self.make_commander(CommandHandler)
-        commander.execute.side_effect = NoSuchPath(wanted="/v1/other", available=["/v1/somewhere"])
+        executor = mock.Mock(name="executor")
+        executor.execute = asynctest.mock.CoroutineMock(name="execute")
+        executor.execute.side_effect = NoSuchPath(wanted="/v1/other", available=["/v1/somewhere"])
+        commander.executor = mock.Mock(name="executor()", return_value=executor)
 
         async with Runner(commander) as server:
             await server.assertPUT(self, "/v1/other", {"command": "one"}
