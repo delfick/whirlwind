@@ -47,7 +47,7 @@ class ServerRunner(thp.ServerRunner):
 
 class Runner(thp.ModuleLevelServer):
     async def started_test(self):
-        self.server.num_tests += 1
+        self.runner.num_tests += 1
 
     async def server_runner(self):
         self.final_future = asyncio.Future()

@@ -1,3 +1,4 @@
 sphinx
 sphinx_rtd_theme==0.1.6
 -e .
+-e .[peer,tests]

@@ -3,6 +3,7 @@
 
     docs/server
     docs/handlers
+    docs/test_helpers
 
 .. _whirlwind:
 
