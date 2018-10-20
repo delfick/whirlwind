@@ -27,8 +27,13 @@ class Store:
             new_store.paths[path].update(dict(commands))
         return new_store
 
-    def injected(self, path):
-        return dictobj.Field(sb.overridden(f"{{{path}}}"), formatted=True)
+    def injected(self, path, format_into=sb.NotSpecified, nullable=False):
+        class find_value(sb.Spec):
+            def normalise(s, meta, val):
+                if nullable and path not in meta.everything:
+                    return None
+                return f"{{{path}}}"
+        return dictobj.Field(find_value(), formatted=True, format_into=format_into)
 
     def normalise_prefix(self, prefix, trailing_slash=True):
         if prefix is None:
