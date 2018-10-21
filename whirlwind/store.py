@@ -3,6 +3,7 @@ from whirlwind.commander import Command
 from input_algorithms.errors import BadSpecValue
 from input_algorithms.dictobj import dictobj
 from input_algorithms import spec_base as sb
+from option_merge.formatter import NoFormat
 from collections import defaultdict
 
 class NoSuchPath(Exception):
@@ -31,7 +32,7 @@ class Store:
         class find_value(sb.Spec):
             def normalise(s, meta, val):
                 if nullable and path not in meta.everything:
-                    return None
+                    return NoFormat(None)
                 return f"{{{path}}}"
         return dictobj.Field(find_value(), formatted=True, format_into=format_into)
 
