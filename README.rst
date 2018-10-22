@@ -6,7 +6,7 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
-0.5 - TBD
+0.5 - Oct 22 2018
     * Initial Release
 
 Installation
