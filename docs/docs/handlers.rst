@@ -185,6 +185,7 @@ create a websocket handler. For example:
 
   # Opening the websocket stream to /ws will get us back this message
   # {"reply": <the server_time>, "message_id": "__server_time__"}
+  # unless you supply server_time as None, in which case it won't send server_time
 
   # Then when we send the message {"path": "/somewhere, "body": {"something": True}, "message_id": "message1"}
   # We get back the following two messages
@@ -204,7 +205,8 @@ When you call the ``progress_cb`` callback the reply will be of the form
 Also, the Websocket handler takes in ``server_time`` and ``wsconnections`` as
 parameters. The ``server_time`` is used to tell the client the time at which the
 server was started. This is so the client can determine if the server was changed
-since the last time it started a websocket stream with the server.
+since the last time it started a websocket stream with the server. If you supply
+server_time as None then it won't send this message.
 
 The ``wsconnections`` object is used to store the asyncio tasks that are created
 for each websocket message that is received. It is up to you to wait on these

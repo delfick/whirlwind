@@ -27,6 +27,12 @@ class WSServer(thp.ServerRunner):
                         , "wsconnections": self.wsconnections
                         }
                       )
+                    , ( "/v1/ws_no_server_time"
+                      , Handler
+                      , { "server_time": None
+                        , "wsconnections": self.wsconnections
+                        }
+                      )
                     ]
 
         self.server = WSS(self.final_future)
@@ -36,6 +42,26 @@ class WSServer(thp.ServerRunner):
         await wait_for_futures(self.wsconnections)
 
 describe thp.AsyncTestCase, "SimpleWebSocketBase":
+    async it "does not have server_time message if that is set to None":
+        class Handler(SimpleWebSocketBase):
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
+                return "blah"
+
+        async def doit():
+            message_id = str(uuid.uuid1())
+            async with WSServer(Handler) as server:
+                connection = await server.ws_connect(skip_hook=True, path="/v1/ws_no_server_time")
+                await server.ws_write(connection
+                    , {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
+                    )
+                res = await server.ws_read(connection)
+                self.assertEqual(res, {"reply": "blah", "message_id": message_id})
+
+                connection.close()
+                self.assertIs(await server.ws_read(connection), None)
+
+        await self.wait_for(doit())
+
     async it "modifies ws_connection object":
         class Handler(SimpleWebSocketBase):
             async def process_message(s, path, body, message_id, message_key, progress_cb):

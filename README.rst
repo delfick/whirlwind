@@ -9,6 +9,9 @@ Changlog
 0.5 - Oct 22 2018
     * Initial Release
 
+0.5.1 - TBD
+    * Made the ``__server_time__`` message for SimpleWebSocketBase optional.
+
 Installation
 ------------
 

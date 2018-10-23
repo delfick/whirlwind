@@ -287,7 +287,8 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
 
     def open(self):
         self.key = str(uuid.uuid1())
-        self.reply(self.server_time, message_id="__server_time__")
+        if self.server_time is not None:
+            self.reply(self.server_time, message_id="__server_time__")
         self.hook("websocket_opened")
 
     def reply(self, msg, message_id=None, exc_info=None):
