@@ -175,7 +175,7 @@ class RequestsMixin:
 
         if type(msg) in (dict, list):
             self.set_header("Content-Type", 'application/json; charset=UTF-8')
-            self.write(json.dumps(msg, default=reprer, sort_keys=True, indent="    "))
+            self.write(json.dumps(msg, default=self.reprer, sort_keys=True, indent="    "))
         elif msg.lstrip().startswith("<html>") or msg.lstrip().startswith("<!DOCTYPE html>"):
             self.write(msg)
         else:
@@ -296,7 +296,7 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
         if hasattr(msg, "as_dict"):
             msg = msg.as_dict()
         reply = {"reply": msg, "message_id": message_id}
-        reply = json.dumps(reply, default=lambda o: repr(o)).replace("</", "<\\/")
+        reply = json.dumps(reply, default=self.reprer).replace("</", "<\\/")
 
         if message_id not in ("__tick__", "__server_time__"):
             self.hook("process_reply", msg, exc_info=exc_info)

@@ -1,6 +1,6 @@
 # coding: spec
 
-from whirlwind.request_handlers.base import Simple, Finished
+from whirlwind.request_handlers.base import Simple, Finished, reprer
 
 from tornado.testing import AsyncHTTPTestCase
 import tornado
@@ -21,6 +21,45 @@ describe AsyncHTTPTestCase, "Simple without error":
                     response = self.fetch("/", method=method, body=body)
 
             self.assertEqual(response.code, 405)
+
+    describe "Uses reprer":
+        def get_app(self):
+            self.path = "/path"
+            self.result = str(uuid.uuid1())
+
+            class Thing:
+                def __special_repr__(self):
+                    return {"special": "|<>THING<>|"}
+
+            def better_reprer(o):
+                if isinstance(o, Thing):
+                    return o.__special_repr__()
+                return reprer(o)
+
+            class FilledSimple(Simple):
+                def initialize(s, *args, **kwargs):
+                    super().initialize()
+                    s.reprer = better_reprer
+
+                async def do_get(s):
+                    return {"thing": Thing()}
+
+                async def do_post(s):
+                    return {"body": s.body_as_json(), "thing": Thing()}
+            return tornado.web.Application([(self.path, FilledSimple)])
+
+        it "works":
+            response = self.fetch(self.path)
+            self.assertEqual(response.code, 200)
+            self.assertEqual(json.loads(response.body.decode())
+                , {"thing": {"special": "|<>THING<>|"}}
+                )
+
+            response = self.fetch(self.path, method="POST", body=json.dumps({"one": True}))
+            self.assertEqual(response.code, 200)
+            self.assertEqual(json.loads(response.body.decode())
+                , {"thing": {"special": "|<>THING<>|"}, "body": {"one": True}}
+                )
 
     describe "With Get":
         def get_app(self):

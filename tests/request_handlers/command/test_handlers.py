@@ -2,6 +2,7 @@
 
 from whirlwind.request_handlers.command import WSHandler, CommandHandler
 from whirlwind.server import Server, wait_for_futures
+from whirlwind.request_handlers.base import reprer
 from whirlwind import test_helpers as thp
 from whirlwind.commander import Command
 from whirlwind.store import NoSuchPath
@@ -12,27 +13,46 @@ import asynctest
 import asyncio
 import time
 
+class Thing:
+    def __special_repr__(self):
+        return {"special": "<|<THING>|>"}
+
+def better_reprer(o):
+    if isinstance(o, Thing):
+        return o.__special_repr__()
+    return reprer(o)
+
 class Runner(thp.ServerRunner):
     def __init__(self, commander):
         self.final_future = asyncio.Future()
         self.wsconnections = {}
 
+        class WSH(WSHandler):
+            def initialize(self, *args, **kwargs):
+                super().initialize(*args, **kwargs)
+                self.reprer = better_reprer
+
+        class CommandH(CommandHandler):
+            def initialize(self, *args, **kwargs):
+                super().initialize(*args, **kwargs)
+                self.reprer = better_reprer
+
         class S(Server):
             def tornado_routes(s):
                 return [
                       ( "/v1/ws"
-                      , WSHandler
+                      , WSH
                       , { "commander": commander
                         , "server_time": time.time()
                         , "wsconnections": self.wsconnections
                         }
                       )
                     , ( "/v1/somewhere"
-                      , CommandHandler
+                      , CommandH
                       , {"commander": commander}
                       )
                     , ( "/v1/other"
-                      , CommandHandler
+                      , CommandH
                       , {"commander": commander}
                       )
                     ]
@@ -55,9 +75,9 @@ describe thp.AsyncTestCase, "WSHandler and CommandHandler":
 
             async def execute(s, path, body, extra_options=None):
                 self.assertIsInstance(s.request_handler, handlerKls)
-                s.progress_cb("information", one=1)
+                s.progress_cb("information", one=1, thing=Thing())
                 s.progress_cb(ValueError("NOPE"))
-                return {"success": True, **s.extra}
+                return {"success": True, "thing": Thing(), **s.extra}
         commander.executor.side_effect = Executor
         return commander
 
@@ -71,16 +91,24 @@ describe thp.AsyncTestCase, "WSHandler and CommandHandler":
             async with server.ws_stream(self) as stream:
                 await stream.start("/v1/somewhere", {"command": "one"})
                 message_id = stream.message_id
-                await stream.check_reply({'progress': {'info': "information", "one": 1}})
+                await stream.check_reply({'progress': {'info': "information", "one": 1, "thing": {"special": "<|<THING>|>"}}})
                 await stream.check_reply({'progress': {'error': "NOPE", "error_code": "ValueError"}})
-                await stream.check_reply({"success": True, "message_id": message_id, "message_key": mock.ANY})
+                await stream.check_reply(
+                      { "success": True
+                      , "thing": {"special": "<|<THING>|>"}
+                      , "message_id": message_id
+                      , "message_key": mock.ANY
+                      }
+                    )
 
     @thp.with_timeout
     async it "CommandHandler calls out to commander.execute":
         commander = self.make_commander(CommandHandler)
 
         async with Runner(commander) as server:
-            await server.assertPUT(self, "/v1/somewhere", {"command": "one"}, json_output={"success": True})
+            await server.assertPUT(self, "/v1/somewhere", {"command": "one"}
+                , json_output = {"success": True, "thing": {"special": "<|<THING>|>"}}
+                )
 
     @thp.with_timeout
     async it "raises 404 if the path is invalid":
