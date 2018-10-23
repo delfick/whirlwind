@@ -241,12 +241,13 @@ class WSStream:
         # When the context manager is exited, the stream is closed and we assert
         # that there are no new messages left
     """
-    def __init__(self, server, test):
+    def __init__(self, server, test, path=None):
         self.test = test
+        self.path = path
         self.server = server
 
     async def __aenter__(self):
-        self.connection = await self.server.ws_connect()
+        self.connection = await self.server.ws_connect(path=self.path)
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
@@ -374,9 +375,9 @@ class ServerRunner:
     async def after_close(self, exc_type, exc, tb):
         """Hook called when this server is closed"""
 
-    def ws_stream(self, test):
+    def ws_stream(self, test, path=None):
         """Helper to return a WSStream object for this server"""
-        return WSStream(self, test)
+        return WSStream(self, test, path=path)
 
     async def after_ws_open(self, connection):
         """
@@ -446,8 +447,7 @@ class ServerRunner:
         """Hook to return the path to the websocket handler on the server"""
         return "/v1/ws"
 
-    @property
-    def ws_url(self):
+    def ws_url(self, path=None):
         """
         Hook to return the websocket address to our websocket handler
 
@@ -455,16 +455,17 @@ class ServerRunner:
 
             f"ws://127.0.0.1:{self.port}{self.ws_path}"
         """
-        return f"ws://127.0.0.1:{self.port}{self.ws_path}"
+        return f"ws://127.0.0.1:{self.port}{path or self.ws_path}"
 
-    async def ws_connect(self):
+    async def ws_connect(self, skip_hook=False, path=None):
         """
         Create a connection to our ``self.ws_url``, call the ``after_ws_open``
         hook with the connection and return the connection.
         """
-        connection = await websocket_connect(self.ws_url)
+        connection = await websocket_connect(self.ws_url(path))
 
-        await self.after_ws_open(connection)
+        if not skip_hook:
+            await self.after_ws_open(connection)
 
         return connection
 
