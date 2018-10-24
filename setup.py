@@ -33,6 +33,7 @@ setup(
     , author = "Stephen Moore"
     , author_email = "delfick755@gmail.com"
     , description = "Wrapper around the tornado web server library"
+    , long_description = open("README.rst").read()
     , license = "MIT"
     , keywords = "tornado web"
     )

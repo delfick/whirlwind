@@ -9,7 +9,7 @@ Changlog
 0.5 - Oct 22 2018
     * Initial Release
 
-0.5.1 - TBD
+0.5.1 - Oct 24 2018
     * Made the ``__server_time__`` message for SimpleWebSocketBase optional.
     * Made sure to actually use the reprer set on request handlers
     * ProgressMessageMaker doesn't nest dictionaries it receives
@@ -38,7 +38,7 @@ For example:
     
         , install_requires =
           [ "whirlwind-web[peer]"
-          , "whirlwind-web==0.5"
+          , "whirlwind-web==0.5.1"
           ]
         )
 
