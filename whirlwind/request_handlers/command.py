@@ -8,9 +8,18 @@ log = logging.getLogger("whirlwind.request_handlers.command")
 
 class ProgressMessageMaker:
     def __init__(self, stack_level=0):
-        frm = inspect.stack()[1 + stack_level]
-        mod = inspect.getmodule(frm[0])
-        self.logger_name = mod.__name__
+        mod = None
+        try:
+            stack = inspect.stack()
+            frm = stack[1 + stack_level]
+            mod = inspect.getmodule(frm[0])
+        except:
+            pass
+
+        if mod and hasattr(mod, "__name__"):
+            self.logger_name = mod.__name__
+        else:
+            self.logger_name = "whirlwind.request_handlers.command"
 
     def __call__(self, body, message, do_log=True, **kwargs):
         info = self.make_info(body, message, **kwargs)
