@@ -219,3 +219,47 @@ The other thing that this handler will do for you is handle any message of the
 form ``{"path": "__tick__", "message_id": "__tick__"}`` with the reply of
 ``{"message_id": "__tick__", "reply": {"ok": "thankyou"}}``. This is so clients
 can keep the connection alive by sending such messages every so often.
+
+Progress Callback
+-----------------
+
+You can intercept calls to the ``progress_cb`` by implementing ``transform_progress``
+on your handler. For example:
+
+
+.. code-block:: python
+
+  from whirlwind.request_handlers.base import SimpleWebSocketBase
+
+  class WSHandler(SimpleWebSocketBase):
+      def transform_progress(self, body, progress, **kwargs):
+          # Body will be the whole message.
+          # i.e. ``{"path": "/one/two", "body": {"arg": 1}, "message_id": <message_id>}``
+          # progress will be the first argument to progress_cb
+          # kwargs is any keyword arguments given to progress_cb
+          # You then yield 0 or more messages that will be sent back
+          if progress == "ignore":
+              # Note that you must yield somewhere in the function so it's a generator function
+              # Even if you never return from it
+              return
+
+          if type(progress) is list:
+              for thing in progress:
+                  yield {"progress": progress, "kwargs": kwargs}
+          else:
+              yield progress
+
+      async def process_message(self, path, body, message_id, message_key, progress_cb):
+          # With transform_progress above this will generate no progress reply
+          progress_cb("ignore")
+
+          # This will generate multiple progress replies
+          progress_cb([1, 2], arg=3)
+
+          # This will generate one progress message
+          progress_cb({"called_path": path, "called_body": body})
+
+          return {"success": True}
+
+By default ``transform_progress`` will ignore all keyword arguments and just
+yield the progress argument once.

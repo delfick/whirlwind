@@ -348,7 +348,10 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
             async def doit():
                 info = {}
 
-                progress_cb = lambda progress: self.reply({"progress": progress}, message_id=message_id)
+                def progress_cb(progress, **kwargs):
+                    for m in self.transform_progress(msg, progress, **kwargs):
+                        self.reply({"progress": m}, message_id=message_id)
+
                 async with self.async_catcher(info, on_processed):
                     info["result"] = await self.process_message(path, body, message_id, message_key, progress_cb)
 
@@ -364,6 +367,23 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
             t = asyncio.get_event_loop().create_task(doit())
             t.add_done_callback(done)
             self.wsconnections[message_key] = t
+
+    def transform_progress(self, body, progress, **kwargs):
+        """
+        Hook for transforming progress messages. This must be a generator that yields 0 or more messages
+
+        So when the ``progress_cb`` is called like ``progress_cb("some message", arg=1)`` we will do:
+
+        .. code-block:: python
+
+            for m in self.transform_progress(<request>, "some message", arg=1):
+                # write ``{"reply": {"progress": m}, "message_id": <message_id>}``
+
+        where ``<request>`` is the entire message that started this stream.
+
+        By default kwargs are ignored and we just yield ``progress`` once
+        """
+        yield progress
 
     async def process_message(self, path, body, message_id, message_key, progress_cb):
         """

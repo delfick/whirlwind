@@ -62,6 +62,97 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
 
         await self.wait_for(doit())
 
+    @thp.with_timeout
+    async it "can modify what comes from a progress message":
+        class Handler(SimpleWebSocketBase):
+            def transform_progress(self, body, message, **kwargs):
+                yield {"body": body, "message": message, "kwargs": kwargs}
+
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
+                progress_cb("WAT", arg=1, do_log=False, stack_extra=1)
+                return "blah"
+
+        message_id = str(uuid.uuid1())
+        async with WSServer(Handler) as server:
+            connection = await server.ws_connect()
+            msg = {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
+            await server.ws_write(connection, msg)
+
+            res = await server.ws_read(connection)
+            progress = {"body": msg, "message": "WAT", "kwargs": {"arg": 1, "do_log": False, "stack_extra": 1}}
+            self.assertEqual(res, {"reply": {"progress": progress}, "message_id": message_id})
+
+            res = await server.ws_read(connection)
+            self.assertEqual(res, {"reply": "blah", "message_id": message_id})
+
+            connection.close()
+            self.assertIs(await server.ws_read(connection), None)
+
+    @thp.with_timeout
+    async it "can yield 0 progress messages if we so desire":
+        class Handler(SimpleWebSocketBase):
+            def transform_progress(self, body, message, **kwargs):
+                if message == "ignore":
+                    return
+                yield message
+
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
+                progress_cb("hello")
+                progress_cb("ignore")
+                progress_cb("there")
+                return "blah"
+
+        message_id = str(uuid.uuid1())
+        async with WSServer(Handler) as server:
+            connection = await server.ws_connect()
+            msg = {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
+            await server.ws_write(connection, msg)
+
+            async def assertProgress(expect):
+                self.assertEqual(await server.ws_read(connection)
+                    , {"reply": {"progress": expect}, "message_id": message_id}
+                    )
+
+            await assertProgress("hello")
+            await assertProgress("there")
+
+            res = await server.ws_read(connection)
+            self.assertEqual(res, {"reply": "blah", "message_id": message_id})
+
+            connection.close()
+            self.assertIs(await server.ws_read(connection), None)
+
+    @thp.with_timeout
+    async it "can yield multiple progress messages if we so desire":
+        class Handler(SimpleWebSocketBase):
+            def transform_progress(self, body, message, **kwargs):
+                for m in message:
+                    yield m
+
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
+                progress_cb(["hello", "people"])
+                return "blah"
+
+        message_id = str(uuid.uuid1())
+        async with WSServer(Handler) as server:
+            connection = await server.ws_connect()
+            msg = {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
+            await server.ws_write(connection, msg)
+
+            async def assertProgress(expect):
+                self.assertEqual(await server.ws_read(connection)
+                    , {"reply": {"progress": expect}, "message_id": message_id}
+                    )
+
+            await assertProgress("hello")
+            await assertProgress("people")
+
+            res = await server.ws_read(connection)
+            self.assertEqual(res, {"reply": "blah", "message_id": message_id})
+
+            connection.close()
+            self.assertIs(await server.ws_read(connection), None)
+
     async it "modifies ws_connection object":
         class Handler(SimpleWebSocketBase):
             async def process_message(s, path, body, message_id, message_key, progress_cb):
