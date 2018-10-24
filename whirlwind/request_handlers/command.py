@@ -38,6 +38,8 @@ class ProgressMessageMaker:
                 info["error"] = str(message)
         elif message is None:
             info["done"] = True
+        elif type(message) is dict:
+            info.update(message)
         else:
             info["info"] = message
 

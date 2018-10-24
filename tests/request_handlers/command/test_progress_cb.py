@@ -70,6 +70,19 @@ describe TestCase, "ProgressMessageMaker":
             info = ProgressMessageMaker().make_info(body, None, c=c)
             self.assertEqual(info, {"done": True, "c": c})
 
+        it "passes dictionary through as is and with kwargs":
+            d = mock.Mock(name="d")
+            body = mock.Mock(name="body")
+            message = {"one": "two"}
+            info = ProgressMessageMaker().make_info(body, message)
+            self.assertEqual(info, {"one": "two"})
+
+            info = ProgressMessageMaker().make_info(body, message, d=d)
+            self.assertEqual(info, {"one": "two", "d": d})
+
+            # and doesn't modify the original
+            self.assertEqual(message, {"one": "two"})
+
         it "pass through message as info otherwise":
             d = mock.Mock(name="d")
             body = mock.Mock(name="body")
