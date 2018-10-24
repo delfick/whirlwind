@@ -88,14 +88,13 @@ class WSHandler(SimpleWebSocketBase, ProcessReplyMixin):
         self.commander = commander
         super().initialize(server_time, wsconnections)
 
-    async def process_message(self, path, body, message_id, message_key, progress_cb):
-        def pcb(message, stack_extra=0, **kwargs):
-            maker = self.progress_maker(1 + stack_extra)
-            info = maker(body, message, **kwargs)
-            progress_cb(info)
+    def transform_progress(self, body, progress, stack_extra=0, **kwargs):
+        maker = self.progress_maker(2 + stack_extra)
+        yield maker(body, progress, **kwargs)
 
+    async def process_message(self, path, body, message_id, message_key, progress_cb):
         try:
-            executor = self.commander.executor(pcb, self, message_key=message_key, message_id=message_id)
+            executor = self.commander.executor(progress_cb, self, message_key=message_key, message_id=message_id)
             return await executor.execute(path, body)
         except NoSuchPath as error:
             raise Finished(status=404, wanted=error.wanted, available=error.available, error="Specified path is invalid")
