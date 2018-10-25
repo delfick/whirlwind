@@ -677,7 +677,7 @@ class ModuleLevelServer:
         if self.closer is not None:
             self.loop.run_until_complete(self.closer())
         self.loop.close()
-        asyncio.set_event_loop(None)
+        asyncio.set_event_loop(asyncio.new_event_loop())
 
     async def started_test(self):
         """Hook called at the start of each test"""

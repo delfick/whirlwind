@@ -8,6 +8,7 @@ Changlog
 
 0.5.2 - TBD
     * Added a message_done hook to SimpleWebSocketBase
+    * Fixed the test helpers so that you aren't left with no set asyncio loop
 
 0.5.1 - Oct 24 2018
     * Made the ``__server_time__`` message for SimpleWebSocketBase optional.
