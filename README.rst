@@ -6,14 +6,14 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
-0.5 - Oct 22 2018
-    * Initial Release
-
 0.5.1 - Oct 24 2018
     * Made the ``__server_time__`` message for SimpleWebSocketBase optional.
     * Made sure to actually use the reprer set on request handlers
     * ProgressMessageMaker doesn't nest dictionaries it receives
     * Added a transform_progress hook to SimpleWebSocketBase
+
+0.5 - Oct 22 2018
+    * Initial Release
 
 Installation
 ------------
