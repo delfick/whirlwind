@@ -337,13 +337,17 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
                 self.reply({"ok": "thankyou"}, message_id=message_id)
                 return
 
-            def on_processed(msg, exc_info=None):
-                if msg is self.Closing:
+            def on_processed(final, exc_info=None):
+                if final is self.Closing:
                     self.reply({"closing": "goodbye"}, message_id=message_id)
                     self.close()
-                    return
+                else:
+                    self.reply(final, message_id=message_id, exc_info=exc_info)
 
-                self.reply(msg, message_id=message_id, exc_info=exc_info)
+                try:
+                    self.message_done(msg, final, message_key, exc_info=exc_info)
+                except Exception as error:
+                    log.exception(error)
 
             async def doit():
                 info = {}
@@ -367,6 +371,25 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
             t = asyncio.get_event_loop().create_task(doit())
             t.add_done_callback(done)
             self.wsconnections[message_key] = t
+
+    def message_done(self, request, final, message_key, exc_info=None):
+        """
+        Hook for when we have finished processing a request
+
+        By default nothing is done.
+
+        request
+            The original request
+
+        final
+            The last response to be sent back.
+
+        message_key
+            The uuid the server generated for this request
+
+        exc_info
+            The (exc_type, exc, traceback) for any exception that stopped the processing of the request
+        """
 
     def transform_progress(self, body, progress, **kwargs):
         """

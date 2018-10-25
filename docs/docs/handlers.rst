@@ -263,3 +263,27 @@ on your handler. For example:
 
 By default ``transform_progress`` will ignore all keyword arguments and just
 yield the progress argument once.
+
+Response message for a Websocket Handler
+----------------------------------------
+
+SimpleWebSocketBase provides a hook that is called when the ``process_message``
+method finishes and has sent the reply back to the client. This hook takes in
+the original request, the final message (after transformations), the
+``message_key`` uuid generated for this message by the server; and exception
+information if ``process_message`` raised an exception.
+
+For example:
+
+.. code-block:: python
+
+  from whirlwind.request_handlers.base import SimpleWebSocketBase
+
+  class WSHandler(SimpleWebSocketBase):
+      def message_done(self, request, final, message_key, exc_info):
+          # For example, if our final message says "closing" we can close the connection
+          if type(final) is dict and final.get("closing"):
+              self.close()
+
+      async def process_message(self, path, body, message_id, message_key, progress_cb):
+          return {"closing": True}

@@ -153,6 +153,129 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
             connection.close()
             self.assertIs(await server.ws_read(connection), None)
 
+    @thp.with_timeout
+    async it "calls the message_done callback":
+        info = {"message_key": None}
+        called = []
+
+        class Handler(SimpleWebSocketBase):
+            def message_done(self, request, final, message_key, exc_info=None):
+                called.append((request, final, message_key, exc_info))
+
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
+                info["message_key"] = message_key
+                called.append("process")
+                progress_cb("hello")
+                return "blah"
+
+        message_id = str(uuid.uuid1())
+        async with WSServer(Handler) as server:
+            connection = await server.ws_connect()
+            msg = {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
+            await server.ws_write(connection, msg)
+
+            self.assertEqual(await server.ws_read(connection)
+                , {"reply": {"progress": "hello"}, "message_id": message_id}
+                )
+
+            res = await server.ws_read(connection)
+            self.assertEqual(res, {"reply": "blah", "message_id": message_id})
+
+            assert info["message_key"] is not None
+            self.assertEqual(called
+                , [ "process"
+                  , (msg, "blah", info["message_key"], None)
+                  ]
+                )
+
+            connection.close()
+            self.assertIs(await server.ws_read(connection), None)
+
+    @thp.with_timeout
+    async it "calls the message_done with exc_info if an exception is raised in process_message":
+        info = {"message_key": None}
+        error = ValueError("NOPE")
+        called = []
+
+        class Handler(SimpleWebSocketBase):
+            def message_done(self, request, final, message_key, exc_info=None):
+                called.append((request, final, message_key, exc_info))
+
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
+                info["message_key"] = message_key
+                called.append("process")
+                progress_cb("hello")
+                raise error
+
+        message_id = str(uuid.uuid1())
+        async with WSServer(Handler) as server:
+            connection = await server.ws_connect()
+            msg = {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
+            await server.ws_write(connection, msg)
+
+            self.assertEqual(await server.ws_read(connection)
+                , {"reply": {"progress": "hello"}, "message_id": message_id}
+                )
+
+            res = await server.ws_read(connection)
+            reply = {"error": "Internal Server Error", "error_code": "InternalServerError", "status": 500}
+            self.assertEqual(res, {"reply": reply, "message_id": message_id})
+
+            assert info["message_key"] is not None
+
+            class ATraceback:
+                def __eq__(self, other):
+                    return isinstance(other, types.TracebackType)
+
+            self.assertEqual(called
+                , [ "process"
+                  , (msg, reply, info["message_key"], (ValueError, error, ATraceback()))
+                  ]
+                )
+
+            connection.close()
+            self.assertIs(await server.ws_read(connection), None)
+
+    @thp.with_timeout
+    async it "message_done can be used to close the connection":
+        info = {"message_key": None}
+        error = ValueError("NOPE")
+        called = []
+
+        class Handler(SimpleWebSocketBase):
+            def message_done(self, request, final, message_key, exc_info=None):
+                called.append((request, final, message_key, exc_info))
+                self.close()
+
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
+                info["message_key"] = message_key
+                called.append("process")
+                progress_cb("there")
+                return {"one": "two"}
+
+        message_id = str(uuid.uuid1())
+        async with WSServer(Handler) as server:
+            connection = await server.ws_connect()
+            msg = {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
+            await server.ws_write(connection, msg)
+
+            self.assertEqual(await server.ws_read(connection)
+                , {"reply": {"progress": "there"}, "message_id": message_id}
+                )
+
+            res = await server.ws_read(connection)
+            self.assertEqual(res, {"reply": {"one": "two"}, "message_id": message_id})
+
+            assert info["message_key"] is not None
+
+            self.assertEqual(called
+                , [ "process"
+                  , (msg, {"one": "two"}, info["message_key"], None)
+                  ]
+                )
+
+            self.assertIs(await server.ws_read(connection), None)
+
     async it "modifies ws_connection object":
         class Handler(SimpleWebSocketBase):
             async def process_message(s, path, body, message_id, message_key, progress_cb):
