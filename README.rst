@@ -6,7 +6,7 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
-0.5.2 - TBD
+0.5.2 - Oct 25 2018
     * Added a message_done hook to SimpleWebSocketBase
     * Fixed the test helpers so that you aren't left with no set asyncio loop
 
@@ -42,7 +42,7 @@ For example:
     
         , install_requires =
           [ "whirlwind-web[peer]"
-          , "whirlwind-web==0.5.1"
+          , "whirlwind-web==0.5.2"
           ]
         )
 
