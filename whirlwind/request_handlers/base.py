@@ -287,6 +287,7 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
 
     def open(self):
         self.key = str(uuid.uuid1())
+        self.connection_future = asyncio.Future()
         if self.server_time is not None:
             self.reply(self.server_time, message_id="__server_time__")
         self.hook("websocket_opened")
@@ -432,3 +433,4 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
 
     def on_close(self):
         """Hook for when a websocket connection closes"""
+        self.connection_future.cancel()

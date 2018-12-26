@@ -6,6 +6,10 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
+0.5.3 - TBD
+    * WSHandler now has a connection_future that is cancelled if we lose the
+      connection
+
 0.5.2 - Oct 25 2018
     * Added a message_done hook to SimpleWebSocketBase
     * Fixed the test helpers so that you aren't left with no set asyncio loop

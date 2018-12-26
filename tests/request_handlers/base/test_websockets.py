@@ -62,6 +62,37 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
 
         await self.wait_for(doit())
 
+    async it "knows when the connection has closed":
+        done = asyncio.Future()
+
+        class Handler(SimpleWebSocketBase):
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
+                progress_cb(body)
+                try:
+                    await s.connection_future
+                except asyncio.CancelledError:
+                    done.set_result(True)
+
+        async def doit():
+            message_id = str(uuid.uuid1())
+            async with WSServer(Handler) as server:
+                connection = await server.ws_connect(skip_hook=True, path="/v1/ws_no_server_time")
+                await server.ws_write(connection
+                    , {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
+                    )
+                res = await server.ws_read(connection)
+                self.assertEqual(res, {"reply": {"progress": {"hello": "there"}}, "message_id": message_id})
+
+                await asyncio.sleep(0.001)
+                assert not done.done()
+
+                connection.close()
+                self.assertIs(await server.ws_read(connection), None)
+
+            self.assertIs(await done, True)
+
+        await self.wait_for(doit())
+
     @thp.with_timeout
     async it "can modify what comes from a progress message":
         class Handler(SimpleWebSocketBase):
