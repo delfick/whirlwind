@@ -6,7 +6,7 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
-0.5.3 - TBD
+0.5.3 - Dec 26 2018
     * WSHandler now has a connection_future that is cancelled if we lose the
       connection
 
