@@ -6,7 +6,7 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
-0.6 - TBD
+0.6 - 18 September 2019
     * Migrated to `delfick_project <https://delfick-project.readthedocs.io/en/latest/index.html>`_
 
 0.5.3 - Dec 26 2018
