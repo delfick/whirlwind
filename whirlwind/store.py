@@ -1,9 +1,7 @@
 from whirlwind.commander import Command
 
-from input_algorithms.errors import BadSpecValue
-from input_algorithms.dictobj import dictobj
-from input_algorithms import spec_base as sb
-from option_merge.formatter import NoFormat
+from delfick_project.norms import dictobj, sb, BadSpecValue
+from delfick_project.option_merge import NoFormat
 from collections import defaultdict
 
 class NoSuchPath(Exception):

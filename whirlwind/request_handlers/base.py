@@ -1,7 +1,5 @@
+from delfick_project.norms import sb, dictobj, Meta
 from tornado.web import RequestHandler, HTTPError
-from input_algorithms import spec_base as sb
-from input_algorithms.dictobj import dictobj
-from input_algorithms.meta import Meta
 from tornado import websocket
 import binascii
 import logging

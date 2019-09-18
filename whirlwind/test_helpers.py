@@ -24,11 +24,12 @@ server.
 .. autoclass:: WSStream
     :members:
 """
+from delfick_project.errors import DelfickErrorTestMixin
 from asynctest import TestCase as AsyncTestCase
 from tornado.websocket import websocket_connect
 from tornado.httpclient import AsyncHTTPClient
-from input_algorithms import spec_base as sb
 from contextlib import contextmanager
+from delfick_project.norms import sb
 from functools import partial
 import logging
 import asyncio
@@ -153,7 +154,7 @@ def modified_env(**env):
             else:
                 os.environ[key] = val
 
-class AsyncTestCase(AsyncTestCase):
+class AsyncTestCase(AsyncTestCase, DelfickErrorTestMixin):
     """
     This is a class that inherits from asynctest.TestCase. This is essentially
     the same as unittest.TestCase but async.

@@ -4,21 +4,12 @@ from whirlwind.commander import Commander
 from whirlwind import test_helpers as thp
 from whirlwind.store import Store
 
-from option_merge.formatter import MergedOptionStringFormatter
-from input_algorithms.errors import BadSpecValue
-from input_algorithms.dictobj import dictobj
-from input_algorithms import spec_base as sb
+from delfick_project.option_merge import MergedOptionStringFormatter, BadOptionFormat
+from delfick_project.norms import dictobj, sb, BadSpecValue
 from unittest import mock
 import uuid
 
-class Formatter(MergedOptionStringFormatter):
-    def special_get_field(self, *args, **kwargs):
-        pass
-
-    def special_format_field(self, *args, **kwargs):
-        pass
-
-store = Store(default_path="/v1", formatter=Formatter)
+store = Store(default_path="/v1", formatter=MergedOptionStringFormatter)
 
 @store.command("fields_are_required")
 class FieldsRequired(store.Command):
@@ -125,14 +116,12 @@ describe thp.AsyncTestCase, "Commander":
         request_handler = mock.Mock(name="request_handler")
         commander = Commander(store2)
 
-        try:
+        with self.fuzzyAssertRaisesError(BadOptionFormat, "Can't find key in options", chain=["<input>.body.args.notexisting"], key="notexisting"):
             await commander.executor(progress_cb, request_handler).execute(
                   "/v1"
                 , {"command": "fields_are_required"}
                 )
             assert False, "expected an error"
-        except KeyError as error:
-            self.assertEqual(str(error), "<Path(notexisting)>")
 
     @thp.with_timeout
     async it "injected fields complain if they don't match format_into option":
@@ -160,14 +149,11 @@ describe thp.AsyncTestCase, "Commander":
         request_handler = mock.Mock(name="request_handler")
         commander = Commander(store2)
 
-        try:
+        with self.fuzzyAssertRaisesError(BadOptionFormat, "Can't find key in options", chain=["<input>.body.args.option"], key="option"):
             await commander.executor(progress_cb, request_handler).execute(
                   "/v1"
                 , {"command": "injected_can_have_format_into", "args": {"option": "asdf"}}
                 )
-            assert False, "expected an error"
-        except KeyError as error:
-            self.assertEqual(str(error), "<Path(option)>")
 
     @thp.with_timeout
     async it "injected fields can be nullable":

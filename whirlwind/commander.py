@@ -1,6 +1,5 @@
-from input_algorithms.dictobj import dictobj
-from option_merge import MergedOptions
-from input_algorithms.meta import Meta
+from delfick_project.option_merge import MergedOptions
+from delfick_project.norms import dictobj, Meta
 import asyncio
 
 class Command(dictobj.Spec):

@@ -6,6 +6,9 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
+0.6 - TBD
+    * Migrated to `delfick_project <https://delfick-project.readthedocs.io/en/latest/index.html>`_
+
 0.5.3 - Dec 26 2018
     * WSHandler now has a connection_future that is cancelled if we lose the
       connection

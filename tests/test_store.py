@@ -2,11 +2,8 @@
 
 from whirlwind.store import Store, NoSuchPath
 
-from option_merge.formatter import MergedOptionStringFormatter
-from input_algorithms.errors import BadSpecValue
-from input_algorithms.dictobj import dictobj
-from input_algorithms import spec_base as sb
-from input_algorithms.meta import Meta
+from delfick_project.option_merge import MergedOptionStringFormatter
+from delfick_project.norms import dictobj, sb, Meta, BadSpecValue
 from unittest import TestCase, mock
 import uuid
 
@@ -173,14 +170,7 @@ describe TestCase, "Store":
 
     describe "command decorator":
         it "uses the formatter given to the store":
-            class Formatter(MergedOptionStringFormatter):
-                def special_get_field(self, *args, **kwargs):
-                    pass
-
-                def special_format_field(self, *args, **kwargs):
-                    pass
-
-            store = Store(formatter=Formatter)
+            store = Store(formatter=MergedOptionStringFormatter)
 
             @store.command("thing", path="/v1")
             class Thing(store.Command):
@@ -264,14 +254,7 @@ describe TestCase, "Store":
 
     describe "command_spec":
         it "normalises args into the spec for the correct object":
-            class Formatter(MergedOptionStringFormatter):
-                def special_get_field(self, *args, **kwargs):
-                    pass
-
-                def special_format_field(self, *args, **kwargs):
-                    pass
-
-            store = Store(default_path="/v1", formatter=Formatter)
+            store = Store(default_path="/v1", formatter=MergedOptionStringFormatter)
 
             wat = mock.Mock(name="wat")
             meta = Meta({"wat": wat}, [])

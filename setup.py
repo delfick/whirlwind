@@ -10,8 +10,7 @@ setup(
 
     , install_requires =
       [ "tornado >= 5.1.1"
-      , "option_merge >= 1.6"
-      , "input_algorithms >= 0.6.0"
+      , "delfick_project >= 0.5"
       ]
 
     , extras_require =
