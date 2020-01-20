@@ -11,6 +11,7 @@ from functools import partial
 from unittest import mock
 import asynctest
 import asyncio
+import pytest
 import time
 
 
@@ -25,45 +26,40 @@ def better_reprer(o):
     return reprer(o)
 
 
-class Runner(thp.ServerRunner):
-    def __init__(self, commander):
-        self.final_future = asyncio.Future()
-        self.wsconnections = {}
-
+@pytest.fixture()
+def make_wrapper(server_wrapper):
+    def make_wrapper(commander):
         class WSH(WSHandler):
-            def initialize(self, *args, **kwargs):
+            def initialize(s, *args, **kwargs):
                 super().initialize(*args, **kwargs)
-                self.reprer = better_reprer
+                s.reprer = better_reprer
 
         class CommandH(CommandHandler):
-            def initialize(self, *args, **kwargs):
+            def initialize(s, *args, **kwargs):
                 super().initialize(*args, **kwargs)
-                self.reprer = better_reprer
+                s.reprer = better_reprer
 
-        class S(Server):
-            def tornado_routes(s):
-                return [
-                    (
-                        "/v1/ws",
-                        WSH,
-                        {
-                            "commander": commander,
-                            "server_time": time.time(),
-                            "wsconnections": self.wsconnections,
-                        },
-                    ),
-                    ("/v1/somewhere", CommandH, {"commander": commander}),
-                    ("/v1/other", CommandH, {"commander": commander}),
-                ]
+        def tornado_routes(server):
+            return [
+                (
+                    "/v1/ws",
+                    WSH,
+                    {
+                        "commander": commander,
+                        "server_time": time.time(),
+                        "wsconnections": server.wsconnections,
+                    },
+                ),
+                ("/v1/somewhere", CommandH, {"commander": commander}),
+                ("/v1/other", CommandH, {"commander": commander}),
+            ]
 
-        self.server = S(self.final_future)
-        super().__init__(self.final_future, thp.free_port(), self.server, None)
+        return server_wrapper(None, tornado_routes)
 
-    async def after_close(self, exc_type, exc, tb):
-        await wait_for_futures(self.wsconnections)
+    return make_wrapper
 
 
-describe thp.AsyncTestCase, "WSHandler and CommandHandler":
+describe "WSHandler and CommandHandler":
 
     def make_commander(self, handlerKls):
         commander = mock.Mock(name="commander")
@@ -83,14 +79,13 @@ describe thp.AsyncTestCase, "WSHandler and CommandHandler":
         commander.executor.side_effect = Executor
         return commander
 
-    @thp.with_timeout
-    async it "WSHandler calls out to commander.execute":
+    async it "WSHandler calls out to commander.execute", make_wrapper, asserter:
         commander = self.make_commander(WSHandler)
 
         message_id = None
 
-        async with Runner(commander) as server:
-            async with server.ws_stream(self) as stream:
+        async with make_wrapper(commander) as server:
+            async with server.runner.ws_stream(asserter) as stream:
                 await stream.start("/v1/somewhere", {"command": "one"})
                 message_id = stream.message_id
                 await stream.check_reply(
@@ -114,29 +109,27 @@ describe thp.AsyncTestCase, "WSHandler and CommandHandler":
                     }
                 )
 
-    @thp.with_timeout
-    async it "CommandHandler calls out to commander.execute":
+    async it "CommandHandler calls out to commander.execute", make_wrapper, asserter:
         commander = self.make_commander(CommandHandler)
 
-        async with Runner(commander) as server:
-            await server.assertPUT(
-                self,
+        async with make_wrapper(commander) as server:
+            await server.runner.assertPUT(
+                asserter,
                 "/v1/somewhere",
                 {"command": "one"},
                 json_output={"success": True, "thing": {"special": "<|<THING>|>"}},
             )
 
-    @thp.with_timeout
-    async it "raises 404 if the path is invalid":
+    async it "raises 404 if the path is invalid", make_wrapper, asserter:
         commander = self.make_commander(CommandHandler)
         executor = mock.Mock(name="executor")
         executor.execute = asynctest.mock.CoroutineMock(name="execute")
         executor.execute.side_effect = NoSuchPath(wanted="/v1/other", available=["/v1/somewhere"])
         commander.executor = mock.Mock(name="executor()", return_value=executor)
 
-        async with Runner(commander) as server:
-            await server.assertPUT(
-                self,
+        async with make_wrapper(commander) as server:
+            await server.runner.assertPUT(
+                asserter,
                 "/v1/other",
                 {"command": "one"},
                 status=404,
@@ -148,7 +141,7 @@ describe thp.AsyncTestCase, "WSHandler and CommandHandler":
                 },
             )
 
-            async with server.ws_stream(self) as stream:
+            async with server.runner.ws_stream(asserter) as stream:
                 await stream.start("/v1/other", {"command": "one"})
                 await stream.check_reply(
                     {

@@ -4,10 +4,10 @@ from whirlwind.store import Store, NoSuchPath
 
 from delfick_project.option_merge import MergedOptionStringFormatter
 from delfick_project.norms import dictobj, sb, Meta, BadSpecValue
-from unittest import TestCase, mock
+from unittest import mock
 import uuid
 
-describe TestCase, "Store":
+describe "Store":
     it "takes in some things":
         prefix = mock.Mock(name="prefix")
         formatter = mock.Mock(name="formatter")

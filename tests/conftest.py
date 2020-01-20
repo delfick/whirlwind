@@ -12,6 +12,11 @@ async def server_wrapper():
     return ServerWrapper
 
 
+@pytest.fixture(scope="session")
+def asserter():
+    return Asserter()
+
+
 class Asserter:
     def assertEqual(s, a, b, msg=None):
         __tracebackhide__ = True

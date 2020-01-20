@@ -1,12 +1,11 @@
 # coding: spec
 
 from whirlwind.request_handlers.base import AsyncCatcher, Finished, MessageFromExc, reprer
-from whirlwind.test_helpers import AsyncTestCase
 
-from noseOfYeti.tokeniser.async_support import async_noy_sup_setUp
-from unittest import mock, TestCase
+from unittest import mock
 import binascii
 import asyncio
+import pytest
 import types
 import uuid
 import json
@@ -17,11 +16,26 @@ class ATraceback:
         return isinstance(other, types.TracebackType)
 
 
-describe TestCase, "reprer":
+@pytest.fixture()
+def V():
+    class V:
+        info = {}
+        request = mock.Mock(
+            name="request", spec=["_finished", "send_msg", "message_from_exc", "reprer"]
+        )
+        exc_info = mock.Mock(name="exc_info")
+
+        def __init__(s):
+            s.catcher = AsyncCatcher(s.request, s.info)
+
+    return V()
+
+
+describe "reprer":
     it "reprs random objects":
 
         class Other:
-            def __repr__(self):
+            def __repr__(s):
                 return "<<<OTHER>>>"
 
         thing = {"status": 301, "other": Other()}
@@ -40,7 +54,7 @@ describe TestCase, "reprer":
         expected = {"status": 302, "thing": val}
         assert json.loads(got) == expected
 
-describe TestCase, "MessageFromExc":
+describe "MessageFromExc":
     it "returns the kwargs from a Finished":
         error = Finished(status=418, one=1)
         info = MessageFromExc()(Finished, error, None)
@@ -69,7 +83,7 @@ describe TestCase, "MessageFromExc":
             "error_code": "InternalServerError",
         }
 
-describe AsyncTestCase, "AsyncCatcher":
+describe "AsyncCatcher":
     async it "takes in the request, info and final":
         request = mock.Mock(name="request")
         info = mock.Mock(name="info")
@@ -87,68 +101,60 @@ describe AsyncTestCase, "AsyncCatcher":
         assert catcher.final is None
 
     describe "Behaviour":
-        async before_each:
-            self.info = {}
-            self.request = mock.Mock(name="request")
-            self.catcher = AsyncCatcher(self.request, self.info)
-
-        async it "completes with the result from info if no exception is raised":
+        async it "completes with the result from info if no exception is raised", V:
             result = str(uuid.uuid1())
 
             fake_complete = mock.Mock(name="complete")
-            with mock.patch.object(self.catcher, "complete", fake_complete):
-                async with self.catcher:
-                    self.info["result"] = result
+            with mock.patch.object(V.catcher, "complete", fake_complete):
+                async with V.catcher:
+                    V.info["result"] = result
                     assert len(fake_complete.mock_calls) == 0
 
             fake_complete.assert_called_once_with(result, status=200)
 
-        async it "completes with a message from the exception and default status of 500":
+        async it "completes with a message from the exception and default status of 500", V:
             msg = mock.Mock(name="msg")
 
             error = ValueError("lol")
 
             fake_complete = mock.Mock(name="complete")
-            self.request.message_from_exc.return_value = msg
+            V.request.message_from_exc.return_value = msg
 
-            with mock.patch.object(self.catcher, "complete", fake_complete):
-                async with self.catcher:
+            with mock.patch.object(V.catcher, "complete", fake_complete):
+                async with V.catcher:
                     assert len(fake_complete.mock_calls) == 0
-                    assert len(self.request.message_from_exc.mock_calls) == 0
+                    assert len(V.request.message_from_exc.mock_calls) == 0
                     raise error
 
             fake_complete.assert_called_once_with(
                 msg, status=500, exc_info=(ValueError, error, ATraceback())
             )
-            self.request.message_from_exc.assert_called_once_with(ValueError, error, ATraceback())
+            V.request.message_from_exc.assert_called_once_with(ValueError, error, ATraceback())
 
         describe "complete":
-            async before_each:
-                self.exc_info = mock.Mock(name="exc_info")
-
-            async it "calls send_msg with the msg if it's not a dictionary":
+            async it "calls send_msg with the msg if it's not a dictionary", V:
                 kls = type("kls", (object,), {})
                 for thing in (0, 1, [], [1], True, False, None, lambda: 1, kls, kls()):
                     status = mock.Mock(name="status")
                     send_msg = mock.Mock(name="send_msg")
-                    with mock.patch.object(self.catcher, "send_msg", send_msg):
-                        self.catcher.complete(thing, status=status, exc_info=self.exc_info)
-                    send_msg.assert_called_once_with(thing, status=status, exc_info=self.exc_info)
+                    with mock.patch.object(V.catcher, "send_msg", send_msg):
+                        V.catcher.complete(thing, status=status, exc_info=V.exc_info)
+                    send_msg.assert_called_once_with(thing, status=status, exc_info=V.exc_info)
 
-            async it "overrides status with what is found in the dict msg":
+            async it "overrides status with what is found in the dict msg", V:
                 status = mock.Mock(name="status")
                 thing = {"status": 300}
                 send_msg = mock.Mock(name="send_msg")
-                with mock.patch.object(self.catcher, "send_msg", send_msg):
-                    self.catcher.complete(thing, status=status)
+                with mock.patch.object(V.catcher, "send_msg", send_msg):
+                    V.catcher.complete(thing, status=status)
                 send_msg.assert_called_once_with(thing, status=300, exc_info=None)
 
-            async it "reprs random objects":
+            async it "reprs random objects", V:
                 result = str(uuid.uuid1())
-                self.request.reprer = reprer
+                V.request.reprer = reprer
 
                 class Other:
-                    def __repr__(self):
+                    def __repr__(s):
                         return "<<<OTHER>>>"
 
                 thing = {"status": 301, "other": Other()}
@@ -156,37 +162,33 @@ describe AsyncTestCase, "AsyncCatcher":
 
                 status = mock.Mock(name="status")
                 send_msg = mock.Mock(name="send_msg")
-                with mock.patch.object(self.catcher, "send_msg", send_msg):
-                    self.catcher.complete(thing, status=status)
+                with mock.patch.object(V.catcher, "send_msg", send_msg):
+                    V.catcher.complete(thing, status=status)
                 send_msg.assert_called_once_with(expected, status=301, exc_info=None)
 
         describe "send_msg":
-            async before_each:
-                self.request = mock.Mock(name="request", spec=["_finished", "send_msg"])
-                self.catcher = AsyncCatcher(self.request, self.info)
-                self.exc_info = mock.Mock(name="exc_info")
 
-            async it "does nothing if the request is already finished and ws_connection object":
+            async it "does nothing if the request is already finished and ws_connection object", V:
                 msg = mock.Mock(name="msg")
-                self.request._finished = True
-                self.catcher.send_msg(msg)
-                assert len(self.request.send_msg.mock_calls) == 0
+                V.request._finished = True
+                V.catcher.send_msg(msg)
+                assert len(V.request.send_msg.mock_calls) == 0
 
-            async it "uses request.send_msg if final is None":
+            async it "uses request.send_msg if final is None", V:
                 msg = mock.Mock(name="msg")
                 status = mock.Mock(name="status")
-                self.request._finished = False
-                self.catcher.final = None
-                self.catcher.send_msg(msg, status=status, exc_info=self.exc_info)
-                self.request.send_msg.assert_called_once_with(msg, status, exc_info=self.exc_info)
+                V.request._finished = False
+                V.catcher.final = None
+                V.catcher.send_msg(msg, status=status, exc_info=V.exc_info)
+                V.request.send_msg.assert_called_once_with(msg, status, exc_info=V.exc_info)
 
-            async it "uses final if it was specified":
+            async it "uses final if it was specified", V:
                 msg = mock.Mock(name="msg")
-                self.request._finished = False
+                V.request._finished = False
 
                 final = mock.Mock(name="final")
-                self.catcher.final = final
+                V.catcher.final = final
 
-                self.catcher.send_msg(msg, exc_info=self.exc_info)
-                assert len(self.request.send_msg.mock_calls) == 0
-                final.assert_called_once_with(msg, exc_info=self.exc_info)
+                V.catcher.send_msg(msg, exc_info=V.exc_info)
+                assert len(V.request.send_msg.mock_calls) == 0
+                final.assert_called_once_with(msg, exc_info=V.exc_info)

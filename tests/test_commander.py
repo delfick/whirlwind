@@ -6,6 +6,7 @@ from whirlwind.store import Store
 
 from delfick_project.option_merge import MergedOptionStringFormatter, BadOptionFormat
 from delfick_project.norms import dictobj, sb, BadSpecValue
+from delfick_project.errors_pytest import assertRaises
 from unittest import mock
 import uuid
 
@@ -67,9 +68,8 @@ class Thing(store.Command):
         return self, self.value
 
 
-describe thp.AsyncTestCase, "Commander":
+describe "Commander":
 
-    @thp.with_timeout
     async it "works":
         other = mock.Mock(name="other")
         progress_cb = mock.Mock(name="progress_cb")
@@ -92,7 +92,6 @@ describe thp.AsyncTestCase, "Commander":
 
         assert thing.request_future.done()
 
-    @thp.with_timeout
     async it "can be given an executor":
         other = mock.Mock(name="other")
         other2 = mock.Mock(name="other2")
@@ -116,14 +115,13 @@ describe thp.AsyncTestCase, "Commander":
 
         assert thing.request_future.done()
 
-    @thp.with_timeout
     async it "injected fields complain if they don't exist":
         store2 = store.clone()
         progress_cb = mock.Mock(name="progress_cb")
         request_handler = mock.Mock(name="request_handler")
         commander = Commander(store2)
 
-        with self.fuzzyAssertRaisesError(
+        with assertRaises(
             BadOptionFormat,
             "Can't find key in options",
             chain=["<input>.body.args.notexisting"],
@@ -134,7 +132,6 @@ describe thp.AsyncTestCase, "Commander":
             )
             assert False, "expected an error"
 
-    @thp.with_timeout
     async it "injected fields complain if they don't match format_into option":
         store2 = store.clone()
         progress_cb = mock.Mock(name="progress_cb")
@@ -152,14 +149,13 @@ describe thp.AsyncTestCase, "Commander":
             assert isinstance(error, BadSpecValue)
             assert error.message == "Expected an integer"
 
-    @thp.with_timeout
     async it "injected fields do not come from args":
         store2 = store.clone()
         progress_cb = mock.Mock(name="progress_cb")
         request_handler = mock.Mock(name="request_handler")
         commander = Commander(store2)
 
-        with self.fuzzyAssertRaisesError(
+        with assertRaises(
             BadOptionFormat,
             "Can't find key in options",
             chain=["<input>.body.args.option"],
@@ -169,7 +165,6 @@ describe thp.AsyncTestCase, "Commander":
                 "/v1", {"command": "injected_can_have_format_into", "args": {"option": "asdf"}}
             )
 
-    @thp.with_timeout
     async it "injected fields can be nullable":
         store2 = store.clone()
         progress_cb = mock.Mock(name="progress_cb")
@@ -187,7 +182,6 @@ describe thp.AsyncTestCase, "Commander":
         )
         assert got2 == {"optional": value}
 
-    @thp.with_timeout
     async it "can override values":
         store2 = store.clone()
 
@@ -207,7 +201,6 @@ describe thp.AsyncTestCase, "Commander":
         assert thing.store is store2
         assert store is not store2
 
-    @thp.with_timeout
     async it "can inject values that are dictobj's":
 
         class Other(dictobj):

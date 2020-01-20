@@ -2,15 +2,15 @@
 
 from whirlwind.request_handlers.command import ProgressMessageMaker
 
-from unittest import TestCase, mock
+from unittest import mock
 
-describe TestCase, "ProgressMessageMaker":
+describe "ProgressMessageMaker":
     it "can get a logger name":
         maker = ProgressMessageMaker()
         assert maker.logger_name == "tests.request_handlers.command.test_progress_cb"
 
         maker = ProgressMessageMaker(1)
-        assert maker.logger_name == "unittest.case"
+        assert maker.logger_name == "_pytest.python"
 
     it "uses make_info":
         a = mock.Mock(name="a")

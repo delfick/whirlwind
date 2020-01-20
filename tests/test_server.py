@@ -7,9 +7,8 @@ from unittest import mock
 import asynctest
 import asyncio
 
-describe thp.AsyncTestCase, "wait_for_futures":
+describe "wait_for_futures":
 
-    @thp.with_timeout
     async it "waits on not done future and ignores failures":
         pending_fut1 = asyncio.Future()
         asyncio.get_event_loop().call_later(0.1, pending_fut1.set_result, True)
@@ -44,7 +43,7 @@ describe thp.AsyncTestCase, "wait_for_futures":
         for fut in futures.values():
             assert fut.done()
 
-describe thp.AsyncTestCase, "setup":
+describe "setup":
 
     class assertSetupWorks:
         def __init__(self, test, setup_return, *args, **kwargs):
@@ -113,7 +112,6 @@ describe thp.AsyncTestCase, "setup":
                 if not self.final_future.done():
                     self.final_future.cancel()
 
-    @thp.with_timeout
     async it "takes in extra parameters and gives back to tornado.web.Application":
         a = mock.Mock(name="a")
         b = mock.Mock(name="b")
@@ -127,7 +125,6 @@ describe thp.AsyncTestCase, "setup":
             setup.assert_called_once_with(a, b=b)
             FakeApplication.assert_called_once_with(routes, cookie_secret="sup3rs3cr3t")
 
-    @thp.with_timeout
     async it "works if setup returns None":
         c = mock.Mock(name="c")
         d = mock.Mock(name="d")
