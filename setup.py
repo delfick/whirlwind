@@ -2,6 +2,8 @@ from whirlwind import VERSION
 
 from setuptools import setup, find_packages
 
+# fmt: off
+
 setup(
       name = "whirlwind-web"
     , version = VERSION
@@ -35,3 +37,5 @@ setup(
     , license = "MIT"
     , keywords = "tornado web"
     )
+
+# fmt: on
