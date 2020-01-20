@@ -9,6 +9,7 @@ import uuid
 
 log = logging.getLogger("whirlwind.request_handlers.base")
 
+
 class Finished(Exception):
     def __init__(self, status=500, **kwargs):
         self.kwargs = kwargs
@@ -17,10 +18,12 @@ class Finished(Exception):
     def as_dict(self):
         return self.kwargs
 
+
 def reprer(o):
     if type(o) is bytes:
         return binascii.hexlify(o).decode()
     return repr(o)
+
 
 class MessageFromExc:
     def __call__(self, exc_type, exc, tb):
@@ -31,7 +34,12 @@ class MessageFromExc:
 
     def process(self, exc_type, exc, tb):
         log.error(exc, exc_info=(exc_type, exc, tb))
-        return {"status": 500, "error": "Internal Server Error", "error_code": "InternalServerError"}
+        return {
+            "status": 500,
+            "error": "Internal Server Error",
+            "error_code": "InternalServerError",
+        }
+
 
 class AsyncCatcher(object):
     def __init__(self, request, info, final=None):
@@ -79,11 +87,13 @@ class AsyncCatcher(object):
 
         self.send_msg(result, status=status, exc_info=exc_info)
 
+
 class RequestsMixin:
     """
     A mixin class you may use for your handler which provides some handy methods
     for dealing with data
     """
+
     _merged_options_formattable = True
 
     def hook(self, func, *args, **kwargs):
@@ -172,14 +182,15 @@ class RequestsMixin:
             return
 
         if type(msg) in (dict, list):
-            self.set_header("Content-Type", 'application/json; charset=UTF-8')
+            self.set_header("Content-Type", "application/json; charset=UTF-8")
             self.write(json.dumps(msg, default=self.reprer, sort_keys=True, indent="    "))
         elif msg.lstrip().startswith("<html>") or msg.lstrip().startswith("<!DOCTYPE html>"):
             self.write(msg)
         else:
-            self.set_header("Content-Type", 'text/plain; charset=UTF-8')
+            self.set_header("Content-Type", "text/plain; charset=UTF-8")
             self.write(msg)
         self.finish()
+
 
 class Simple(RequestsMixin, RequestHandler):
     """
@@ -243,15 +254,17 @@ class Simple(RequestsMixin, RequestHandler):
         async with self.async_catcher(info):
             info["result"] = await self.do_delete(*args, **kwargs)
 
+
 json_spec = sb.match_spec(
-      (bool, sb.any_spec())
-    , (int, sb.any_spec())
-    , (float, sb.any_spec())
-    , (str, sb.any_spec())
-    , (list, lambda: sb.listof(json_spec))
-    , (type(None), sb.any_spec())
-    , fallback=lambda: sb.dictof(sb.string_spec(), json_spec)
-    )
+    (bool, sb.any_spec()),
+    (int, sb.any_spec()),
+    (float, sb.any_spec()),
+    (str, sb.any_spec()),
+    (list, lambda: sb.listof(json_spec)),
+    (type(None), sb.any_spec()),
+    fallback=lambda: sb.dictof(sb.string_spec(), json_spec),
+)
+
 
 class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
     """
@@ -269,6 +282,7 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
 
     It relies on the client side closing the connection when it's finished.
     """
+
     def initialize(self, server_time, wsconnections):
         self.server_time = server_time
         self.wsconnections = wsconnections
@@ -356,7 +370,9 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
                         self.reply({"progress": m}, message_id=message_id)
 
                 async with self.async_catcher(info, on_processed):
-                    info["result"] = await self.process_message(path, body, message_id, message_key, progress_cb)
+                    info["result"] = await self.process_message(
+                        path, body, message_id, message_key, progress_cb
+                    )
 
             def done(res):
                 if message_key in self.wsconnections:

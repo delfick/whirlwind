@@ -58,6 +58,7 @@ describe TestCase, "ProgressMessageMaker":
             class BadThings(Exception):
                 def as_dict(self):
                     return {"one": 1}
+
             error = BadThings()
 
             body = mock.Mock(name="body")

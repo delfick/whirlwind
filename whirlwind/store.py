@@ -4,10 +4,12 @@ from delfick_project.norms import dictobj, sb, BadSpecValue
 from delfick_project.option_merge import NoFormat
 from collections import defaultdict
 
+
 class NoSuchPath(Exception):
     def __init__(self, wanted, available):
         self.wanted = wanted
         self.available = available
+
 
 class Store:
     Command = Command
@@ -32,6 +34,7 @@ class Store:
                 if nullable and path not in meta.everything:
                     return NoFormat(None)
                 return f"{{{path}}}"
+
         return dictobj.Field(find_value(), formatted=True, format_into=format_into)
 
     def normalise_prefix(self, prefix, trailing_slash=True):
@@ -89,10 +92,9 @@ class Store:
             It uses the FieldSpec in self.paths to normalise the args into
             the Command instance.
             """
+
             def normalise_filled(s, meta, val):
-                v = sb.set_options(
-                      path = sb.required(sb.string_spec())
-                    ).normalise(meta, val)
+                v = sb.set_options(path=sb.required(sb.string_spec())).normalise(meta, val)
 
                 path = v["path"]
 
@@ -100,11 +102,12 @@ class Store:
                     raise NoSuchPath(path, sorted(self.paths))
 
                 val = sb.set_options(
-                      body = sb.required(sb.set_options(
-                        args = sb.dictionary_spec()
-                      , command = sb.required(sb.string_spec())
-                      ))
-                    ).normalise(meta, val)
+                    body=sb.required(
+                        sb.set_options(
+                            args=sb.dictionary_spec(), command=sb.required(sb.string_spec())
+                        )
+                    )
+                ).normalise(meta, val)
 
                 args = val["body"]["args"]
                 name = val["body"]["command"]
@@ -112,11 +115,12 @@ class Store:
                 available_commands = self.paths[path]
 
                 if name not in available_commands:
-                    raise BadSpecValue("Unknown command"
-                        , wanted=name
-                        , available=sorted(available_commands)
-                        , meta=meta.at("body").at("command")
-                        )
+                    raise BadSpecValue(
+                        "Unknown command",
+                        wanted=name,
+                        available=sorted(available_commands),
+                        meta=meta.at("body").at("command"),
+                    )
 
                 return available_commands[name]["spec"].normalise(meta.at("body").at("args"), args)
 

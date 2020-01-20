@@ -11,12 +11,15 @@ import types
 import uuid
 import json
 
+
 class ATraceback:
     def __eq__(self, other):
         return isinstance(other, types.TracebackType)
 
+
 describe TestCase, "reprer":
     it "reprs random objects":
+
         class Other:
             def __repr__(self):
                 return "<<<OTHER>>>"
@@ -60,7 +63,10 @@ describe TestCase, "MessageFromExc":
 
     it "creates an internal server error by default":
         info = MessageFromExc()(ValueError, ValueError("wat"), None)
-        self.assertEqual(info, {"status": 500, "error": "Internal Server Error", "error_code": "InternalServerError"})
+        self.assertEqual(
+            info,
+            {"status": 500, "error": "Internal Server Error", "error_code": "InternalServerError"},
+        )
 
 describe AsyncTestCase, "AsyncCatcher":
     async it "takes in the request, info and final":
@@ -110,7 +116,9 @@ describe AsyncTestCase, "AsyncCatcher":
                     self.assertEqual(len(self.request.message_from_exc.mock_calls), 0)
                     raise error
 
-            fake_complete.assert_called_once_with(msg, status=500, exc_info=(ValueError, error, ATraceback()))
+            fake_complete.assert_called_once_with(
+                msg, status=500, exc_info=(ValueError, error, ATraceback())
+            )
             self.request.message_from_exc.assert_called_once_with(ValueError, error, ATraceback())
 
         describe "complete":
@@ -118,7 +126,7 @@ describe AsyncTestCase, "AsyncCatcher":
                 self.exc_info = mock.Mock(name="exc_info")
 
             async it "calls send_msg with the msg if it's not a dictionary":
-                kls = type("kls", (object, ), {})
+                kls = type("kls", (object,), {})
                 for thing in (0, 1, [], [1], True, False, None, lambda: 1, kls, kls()):
                     status = mock.Mock(name="status")
                     send_msg = mock.Mock(name="send_msg")
@@ -153,7 +161,7 @@ describe AsyncTestCase, "AsyncCatcher":
 
         describe "send_msg":
             async before_each:
-                self.request = mock.Mock(name='request', spec=["_finished", "send_msg"])
+                self.request = mock.Mock(name="request", spec=["_finished", "send_msg"])
                 self.catcher = AsyncCatcher(self.request, self.info)
                 self.exc_info = mock.Mock(name="exc_info")
 

@@ -11,12 +11,14 @@ import uuid
 
 store = Store(default_path="/v1", formatter=MergedOptionStringFormatter)
 
+
 @store.command("fields_are_required")
 class FieldsRequired(store.Command):
     notexisting = store.injected("notexisting")
 
     async def execute(self):
         assert False, "Shouldn't make it this far"
+
 
 @store.command("injected_can_have_format_into")
 class InjectedHaveFormatInto(store.Command):
@@ -25,12 +27,14 @@ class InjectedHaveFormatInto(store.Command):
     async def execute(self):
         assert False, "Shouldn't make it this far"
 
+
 @store.command("injected_values_can_be_nullable")
 class NullableInjected(store.Command):
     optional = store.injected("optional", nullable=True)
 
     async def execute(self):
         return {"optional": self.optional}
+
 
 @store.command("thing_caller")
 class ThingCaller(store.Command):
@@ -40,7 +44,10 @@ class ThingCaller(store.Command):
 
     async def execute(self):
         assert self.optional is None
-        return await self.executor.execute("/v1", {"command": "thing", "args": {"value": f"called! {self.passon}"}})
+        return await self.executor.execute(
+            "/v1", {"command": "thing", "args": {"value": f"called! {self.passon}"}}
+        )
+
 
 @store.command("thing")
 class Thing(store.Command):
@@ -59,7 +66,9 @@ class Thing(store.Command):
         assert not self.request_future.done()
         return self, self.value
 
+
 describe thp.AsyncTestCase, "Commander":
+
     @thp.with_timeout
     async it "works":
         other = mock.Mock(name="other")
@@ -69,9 +78,8 @@ describe thp.AsyncTestCase, "Commander":
 
         value = str(uuid.uuid1())
         thing, val = await commander.executor(progress_cb, request_handler).execute(
-              "/v1"
-            , {"command": "thing", "args": {"value": value}}
-            )
+            "/v1", {"command": "thing", "args": {"value": value}}
+        )
 
         self.assertEqual(val, value)
 
@@ -94,9 +102,8 @@ describe thp.AsyncTestCase, "Commander":
 
         value = str(uuid.uuid1())
         thing, val = await commander.executor(progress_cb, request_handler, other=other2).execute(
-              "/v1"
-            , {"command": "thing_caller", "args": {"passon": value}}
-            )
+            "/v1", {"command": "thing_caller", "args": {"passon": value}}
+        )
 
         self.assertEqual(val, f"called! {value}")
 
@@ -116,11 +123,15 @@ describe thp.AsyncTestCase, "Commander":
         request_handler = mock.Mock(name="request_handler")
         commander = Commander(store2)
 
-        with self.fuzzyAssertRaisesError(BadOptionFormat, "Can't find key in options", chain=["<input>.body.args.notexisting"], key="notexisting"):
+        with self.fuzzyAssertRaisesError(
+            BadOptionFormat,
+            "Can't find key in options",
+            chain=["<input>.body.args.notexisting"],
+            key="notexisting",
+        ):
             await commander.executor(progress_cb, request_handler).execute(
-                  "/v1"
-                , {"command": "fields_are_required"}
-                )
+                "/v1", {"command": "fields_are_required"}
+            )
             assert False, "expected an error"
 
     @thp.with_timeout
@@ -132,9 +143,8 @@ describe thp.AsyncTestCase, "Commander":
 
         try:
             await commander.executor(progress_cb, request_handler, option="asdf").execute(
-                  "/v1"
-                , {"command": "injected_can_have_format_into"}
-                )
+                "/v1", {"command": "injected_can_have_format_into"}
+            )
             assert False, "expected an error"
         except BadSpecValue as error:
             self.assertEqual(len(error.errors), 1)
@@ -149,11 +159,15 @@ describe thp.AsyncTestCase, "Commander":
         request_handler = mock.Mock(name="request_handler")
         commander = Commander(store2)
 
-        with self.fuzzyAssertRaisesError(BadOptionFormat, "Can't find key in options", chain=["<input>.body.args.option"], key="option"):
+        with self.fuzzyAssertRaisesError(
+            BadOptionFormat,
+            "Can't find key in options",
+            chain=["<input>.body.args.option"],
+            key="option",
+        ):
             await commander.executor(progress_cb, request_handler).execute(
-                  "/v1"
-                , {"command": "injected_can_have_format_into", "args": {"option": "asdf"}}
-                )
+                "/v1", {"command": "injected_can_have_format_into", "args": {"option": "asdf"}}
+            )
 
     @thp.with_timeout
     async it "injected fields can be nullable":
@@ -163,16 +177,14 @@ describe thp.AsyncTestCase, "Commander":
         commander = Commander(store2)
 
         got = await commander.executor(progress_cb, request_handler).execute(
-             "/v1"
-           , {"command": "injected_values_can_be_nullable"}
-           )
+            "/v1", {"command": "injected_values_can_be_nullable"}
+        )
         self.assertEqual(got, {"optional": None})
 
         value = str(uuid.uuid4())
         got2 = await commander.executor(progress_cb, request_handler, optional=value).execute(
-             "/v1"
-           , {"command": "injected_values_can_be_nullable"}
-           )
+            "/v1", {"command": "injected_values_can_be_nullable"}
+        )
         self.assertEqual(got2, {"optional": value})
 
     @thp.with_timeout
@@ -187,10 +199,8 @@ describe thp.AsyncTestCase, "Commander":
 
         value = str(uuid.uuid1())
         thing, val = await commander.executor(progress_cb, request_handler).execute(
-              "/v1"
-            , {"command": "thing", "args": {"value": value}}
-            , {"other": other2}
-            )
+            "/v1", {"command": "thing", "args": {"value": value}}, {"other": other2}
+        )
 
         self.assertEqual(val, value)
         self.assertIs(thing.other, other2)
@@ -199,6 +209,7 @@ describe thp.AsyncTestCase, "Commander":
 
     @thp.with_timeout
     async it "can inject values that are dictobj's":
+
         class Other(dictobj):
             fields = ["one"]
 
@@ -209,9 +220,8 @@ describe thp.AsyncTestCase, "Commander":
 
         value = str(uuid.uuid1())
         thing, val = await commander.executor(progress_cb, request_handler).execute(
-              "/v1"
-            , {"command": "thing", "args": {"value": value}}
-            )
+            "/v1", {"command": "thing", "args": {"value": value}}
+        )
 
         self.assertEqual(val, value)
         self.assertIs(thing.other, other)

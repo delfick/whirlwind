@@ -42,13 +42,15 @@ import os
 
 log = logging.getLogger("whirlwind.test_helpers")
 
+
 def free_port():
     """
     Return an unused port number
     """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('0.0.0.0', 0))
+        s.bind(("0.0.0.0", 0))
         return s.getsockname()[1]
+
 
 def port_connected(port):
     """
@@ -62,6 +64,7 @@ def port_connected(port):
         return True
     except Exception:
         return False
+
 
 def with_timeout(func):
     """
@@ -83,10 +86,13 @@ def with_timeout(func):
                 # This will assert False cause the function takes too long
                 await asyncio.sleep(20)
     """
+
     async def test(s):
         await s.wait_for(func(s))
+
     test.__name__ = func.__name__
     return test
+
 
 def async_as_background(coro):
     """
@@ -110,14 +116,17 @@ def async_as_background(coro):
         ...
         await task
     """
+
     def reporter(res):
         if not res.cancelled():
             exc = res.exception()
             if exc:
                 log.exception(exc, exc_info=(type(exc), exc, exc.__traceback__))
+
     t = asyncio.get_event_loop().create_task(coro)
     t.add_done_callback(reporter)
     return t
+
 
 @contextmanager
 def modified_env(**env):
@@ -154,6 +163,7 @@ def modified_env(**env):
             else:
                 os.environ[key] = val
 
+
 class AsyncTestCase(AsyncTestCase, DelfickErrorTestMixin):
     """
     This is a class that inherits from asynctest.TestCase. This is essentially
@@ -174,12 +184,14 @@ class AsyncTestCase(AsyncTestCase, DelfickErrorTestMixin):
                 # This will cause an assertion error cause future never resolves!
                 await self.wait_for(fut)
     """
+
     async def wait_for(self, fut, timeout=1):
         """Await for this future and assert False if it takes longer than the timeout"""
         try:
             return await asyncio.wait_for(fut, timeout=timeout)
         except asyncio.TimeoutError as error:
             assert False, "Failed to wait for future before timeout: {0}".format(error)
+
 
 class WSStream:
     """
@@ -242,6 +254,7 @@ class WSStream:
         # When the context manager is exited, the stream is closed and we assert
         # that there are no new messages left
     """
+
     def __init__(self, server, test, path=None):
         self.test = test
         self.path = path
@@ -264,7 +277,9 @@ class WSStream:
 
     async def start(self, path, body):
         self.message_id = str(uuid.uuid1())
-        await self.server.ws_write(self.connection, {"path": path, "body": body, "message_id": self.message_id})
+        await self.server.ws_write(
+            self.connection, {"path": path, "body": body, "message_id": self.message_id}
+        )
 
     async def check_reply(self, reply):
         d, nd = await asyncio.wait([self.server.ws_read(self.connection)], timeout=5)
@@ -281,6 +296,7 @@ class WSStream:
 
         self.test.assertEqual(got, wanted)
         return got["reply"]
+
 
 class ServerRunner:
     """
@@ -339,11 +355,14 @@ class ServerRunner:
     If you are making multiple assertions to your server, it is reccomended you
     use this class via ``whirlwind.test_helpers.ModuleLevelServer``
     """
+
     def __init__(self, final_future, port, server, wrapper, *args, **kwargs):
         if wrapper is None:
+
             @contextmanager
             def wrapper():
                 yield
+
             wrapper = wrapper()
 
         self.port = port
@@ -387,6 +406,7 @@ class ServerRunner:
         By default this method will just assert that we get back a ``__server_time__``
         message after the connection is made.
         """
+
         class ATime:
             def __eq__(self, other):
                 return type(other) is float
@@ -409,7 +429,10 @@ class ServerRunner:
 
         async def doit():
             with self.wrapper:
-                await self.server.serve("127.0.0.1", self.port, *self.server_args, **self.server_kwargs)
+                await self.server.serve(
+                    "127.0.0.1", self.port, *self.server_args, **self.server_kwargs
+                )
+
         assert not port_connected(self.port)
         self.t = async_as_background(doit())
 
@@ -486,45 +509,61 @@ class ServerRunner:
 
     async def assertGET(self, test, path, status=200, json_output=None, text_output=None):
         """Run ``self.assertHTTP`` with the GET method."""
-        return await self.assertHTTP(test, path, "GET", {}
-            , status = status
-            , json_output = json_output
-            , text_output = text_output
-            )
+        return await self.assertHTTP(
+            test, path, "GET", {}, status=status, json_output=json_output, text_output=text_output
+        )
 
     async def assertPOST(self, test, path, body, status=200, json_output=None, text_output=None):
         """Run ``self.assertHTTP`` with the POST method."""
-        return await self.assertHTTP(test, path, "POST", {"body": json.dumps(body).encode()}
-            , status = status
-            , json_output = json_output
-            , text_output = text_output
-            )
+        return await self.assertHTTP(
+            test,
+            path,
+            "POST",
+            {"body": json.dumps(body).encode()},
+            status=status,
+            json_output=json_output,
+            text_output=text_output,
+        )
 
     async def assertPUT(self, test, path, body, status=200, json_output=None, text_output=None):
         """Run ``self.assertHTTP`` with the PUT method."""
-        return await self.assertHTTP(test, path, "PUT", {"body": json.dumps(body).encode()}
-            , status = status
-            , json_output = json_output
-            , text_output = text_output
-            )
+        return await self.assertHTTP(
+            test,
+            path,
+            "PUT",
+            {"body": json.dumps(body).encode()},
+            status=status,
+            json_output=json_output,
+            text_output=text_output,
+        )
 
     async def assertPATCH(self, test, path, body, status=200, json_output=None, text_output=None):
         """Run ``self.assertHTTP`` with the PATCH method."""
-        return await self.assertHTTP(test, path, "PATCH", {"body": json.dumps(body).encode()}
-            , status = status
-            , json_output = json_output
-            , text_output = text_output
-            )
+        return await self.assertHTTP(
+            test,
+            path,
+            "PATCH",
+            {"body": json.dumps(body).encode()},
+            status=status,
+            json_output=json_output,
+            text_output=text_output,
+        )
 
     async def assertDELETE(self, test, path, status=200, json_output=None, text_output=None):
         """Run ``self.assertHTTP`` with the DELETE method."""
-        return await self.assertHTT(test, path, "DELETE", {}
-            , status = status
-            , json_output = json_output
-            , text_output = text_output
-            )
+        return await self.assertHTT(
+            test,
+            path,
+            "DELETE",
+            {},
+            status=status,
+            json_output=json_output,
+            text_output=text_output,
+        )
 
-    async def assertHTTP(self, test, path, method, kwargs, status=200, json_output=None, text_output=None):
+    async def assertHTTP(
+        self, test, path, method, kwargs, status=200, json_output=None, text_output=None
+    ):
         """
         Make a HTTP request to the server and make assertions about the result.
         The body of the response is returned.
@@ -556,12 +595,11 @@ class ServerRunner:
         client = AsyncHTTPClient()
 
         if "raise_error" not in kwargs:
-            kwargs['raise_error'] = False
+            kwargs["raise_error"] = False
 
-        response = await client.fetch(f"http://127.0.0.1:{self.port}{path}"
-            , method = method
-            , **kwargs
-            )
+        response = await client.fetch(
+            f"http://127.0.0.1:{self.port}{path}", method=method, **kwargs
+        )
 
         output = response.body
         test.assertEqual(response.code, status, output)
@@ -578,6 +616,7 @@ class ServerRunner:
                     raise
             else:
                 test.assertEqual(output, text_output)
+
 
 class ModuleLevelServer:
     """
@@ -642,6 +681,7 @@ class ModuleLevelServer:
             async def test_it_works_twice(self, runner):
                 await runner.assertGET(self, "/v1/somewhere-else", json_output={"three": "four"})
     """
+
     def __init__(self, *args, **kwargs):
         self.loop = asyncio.new_event_loop()
 
@@ -668,7 +708,9 @@ class ModuleLevelServer:
         closer
         """
         asyncio.set_event_loop(self.loop)
-        self.runner, self.closer = self.loop.run_until_complete(self.server_runner(*self.args, **self.kwargs))
+        self.runner, self.closer = self.loop.run_until_complete(
+            self.server_runner(*self.args, **self.kwargs)
+        )
 
     def tearDown(self):
         """
@@ -699,6 +741,7 @@ class ModuleLevelServer:
         And we use our ``run_test`` hook to provide extra arguments to the
         function.
         """
+
         async def test(s):
             await self.started_test()
             s.maxDiff = None

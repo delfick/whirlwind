@@ -4,8 +4,10 @@ import logging
 
 log = logging.getLogger("whirlwind.server")
 
+
 class ForcedQuit(Exception):
     pass
+
 
 class Server(object):
     def __init__(self, final_future):
@@ -47,6 +49,7 @@ class Server(object):
 
     async def cleanup(self):
         """Called after the server has stopped"""
+
 
 async def wait_for_futures(futures):
     """

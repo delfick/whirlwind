@@ -6,6 +6,7 @@ import inspect
 
 log = logging.getLogger("whirlwind.request_handlers.command")
 
+
 class ProgressMessageMaker:
     def __init__(self, stack_level=0):
         mod = None
@@ -49,6 +50,7 @@ class ProgressMessageMaker:
     def do_log(self, body, message, info, **kwargs):
         pass
 
+
 class ProcessReplyMixin:
     def process_reply(self, msg, exc_info=None):
         try:
@@ -57,6 +59,7 @@ class ProcessReplyMixin:
             raise
         except Exception as error:
             log.exception(error)
+
 
 class CommandHandler(Simple, ProcessReplyMixin):
     progress_maker = ProgressMessageMaker
@@ -79,7 +82,13 @@ class CommandHandler(Simple, ProcessReplyMixin):
         try:
             return await self.commander.executor(progress_cb, self).execute(path, j)
         except NoSuchPath as error:
-            raise Finished(status=404, wanted=error.wanted, available=error.available, error="Specified path is invalid")
+            raise Finished(
+                status=404,
+                wanted=error.wanted,
+                available=error.available,
+                error="Specified path is invalid",
+            )
+
 
 class WSHandler(SimpleWebSocketBase, ProcessReplyMixin):
     progress_maker = ProgressMessageMaker
@@ -94,7 +103,14 @@ class WSHandler(SimpleWebSocketBase, ProcessReplyMixin):
 
     async def process_message(self, path, body, message_id, message_key, progress_cb):
         try:
-            executor = self.commander.executor(progress_cb, self, message_key=message_key, message_id=message_id)
+            executor = self.commander.executor(
+                progress_cb, self, message_key=message_key, message_id=message_id
+            )
             return await executor.execute(path, body)
         except NoSuchPath as error:
-            raise Finished(status=404, wanted=error.wanted, available=error.available, error="Specified path is invalid")
+            raise Finished(
+                status=404,
+                wanted=error.wanted,
+                available=error.available,
+                error="Specified path is invalid",
+            )

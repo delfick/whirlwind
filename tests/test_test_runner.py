@@ -11,15 +11,18 @@ import time
 
 store = Store()
 
+
 @store.command("blah")
 class Blah(store.Command):
     async def execute(self):
         return {"hello": "there"}
 
+
 @store.command("meh")
 class Meh(store.Command):
     async def execute(self):
         return {"good": "bye"}
+
 
 class Server(Server):
     async def setup(self, wsconnections, server_time):
@@ -29,14 +32,17 @@ class Server(Server):
 
     def tornado_routes(self):
         return [
-              ( "/v1/ws"
-              , WSHandler
-              , { "commander": self.commander
-                , "server_time": self.server_time
-                , "wsconnections": self.wsconnections
-                }
-              )
-            ]
+            (
+                "/v1/ws",
+                WSHandler,
+                {
+                    "commander": self.commander,
+                    "server_time": self.server_time,
+                    "wsconnections": self.wsconnections,
+                },
+            )
+        ]
+
 
 class ServerRunner(thp.ServerRunner):
     async def before_start(self):
@@ -44,6 +50,7 @@ class ServerRunner(thp.ServerRunner):
 
     async def after_close(self, typ, exc, tb):
         assert self.num_tests == 2
+
 
 class Runner(thp.ModuleLevelServer):
     async def started_test(self):
@@ -56,13 +63,13 @@ class Runner(thp.ModuleLevelServer):
         wsconnections = {}
 
         server = ServerRunner(
-              self.final_future
-            , thp.free_port()
-            , Server(self.final_future)
-            , None
-            , wsconnections
-            , server_time
-            )
+            self.final_future,
+            thp.free_port(),
+            Server(self.final_future),
+            None,
+            wsconnections,
+            server_time,
+        )
 
         await server.start()
 
@@ -71,6 +78,7 @@ class Runner(thp.ModuleLevelServer):
             await server.closer()
 
         return server, closer
+
 
 test_server = Runner()
 
