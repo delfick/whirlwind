@@ -1,2 +1,2 @@
 #!/bin/bash
-nosetests --with-noy $@
+run_whirlwind_pytest -q $@

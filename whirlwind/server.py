@@ -1,6 +1,7 @@
 from tornado.httpserver import HTTPServer
 import tornado.web
 import logging
+import asyncio
 
 log = logging.getLogger("whirlwind.server")
 
@@ -58,8 +59,7 @@ async def wait_for_futures(futures):
     Useful for waiting on the wsconnections object given to a WSHandler
     """
     for t in list(futures.values()):
-        if not t.done():
-            try:
-                await t
-            except:
-                pass
+        try:
+            await t
+        except:
+            pass

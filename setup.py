@@ -17,14 +17,20 @@ setup(
 
     , extras_require =
       { "tests":
-        [ "noseOfYeti>=1.7"
-        , "asynctest==0.10.0"
-        , "nose"
-        , "mock"
+        [ "noseOfYeti==1.9.1"
+        , "asynctest==0.13.0"
+        , "pytest==5.3.1"
+        , "alt-pytest-asyncio==0.5.1"
         ]
       , "peer":
         [ "tornado==5.1.1"
         , "delfick_project==0.5"
+        ]
+      }
+
+    , entry_points =
+      { 'console_scripts' :
+        [ 'run_whirlwind_pytest = whirlwind.test_helpers:run_pytest'
         ]
       }
 

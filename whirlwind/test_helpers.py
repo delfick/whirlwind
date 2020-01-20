@@ -34,6 +34,7 @@ from functools import partial
 import logging
 import asyncio
 import socket
+import pytest
 import uuid
 import time
 import json
@@ -755,3 +756,24 @@ class ModuleLevelServer:
 
         test.__name__ = func.__name__
         return test
+
+
+def run_pytest():
+    class EditConfig:
+        @pytest.hookimpl(hookwrapper=True)
+        def pytest_cmdline_parse(pluginmanager, args):
+            args.extend(
+                [
+                    "--tb=short",
+                    "-o",
+                    "console_output_style=classic",
+                    "-o",
+                    "default_alt_async_timeout=1",
+                    "-W",
+                    'ignore:"@coroutine" decorator is deprecated since Python 3.8',
+                    "--log-level=INFO",
+                ]
+            )
+            yield
+
+    sys.exit(pytest.main(plugins=[EditConfig()]))
