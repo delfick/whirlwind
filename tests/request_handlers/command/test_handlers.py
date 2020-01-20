@@ -75,7 +75,7 @@ describe thp.AsyncTestCase, "WSHandler and CommandHandler":
                 s.request_handler = request_handler
 
             async def execute(s, path, body, extra_options=None):
-                self.assertIsInstance(s.request_handler, handlerKls)
+                assert isinstance(s.request_handler, handlerKls)
                 s.progress_cb("information", one=1, thing=Thing())
                 s.progress_cb(ValueError("NOPE"))
                 return {"success": True, "thing": Thing(), **s.extra}

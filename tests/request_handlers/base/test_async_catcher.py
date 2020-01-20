@@ -28,7 +28,7 @@ describe TestCase, "reprer":
         got = json.dumps(thing, default=reprer)
 
         expected = {"status": 301, "other": "<<<OTHER>>>"}
-        self.assertEqual(json.loads(got), expected)
+        assert json.loads(got) == expected
 
     it "hexlifies bytes objects":
         val = str(uuid.uuid1()).replace("-", "")
@@ -38,13 +38,13 @@ describe TestCase, "reprer":
         got = json.dumps(thing, default=reprer)
 
         expected = {"status": 302, "thing": val}
-        self.assertEqual(json.loads(got), expected)
+        assert json.loads(got) == expected
 
 describe TestCase, "MessageFromExc":
     it "returns the kwargs from a Finished":
         error = Finished(status=418, one=1)
         info = MessageFromExc()(Finished, error, None)
-        self.assertEqual(info, {"status": 418, "one": 1})
+        assert info == {"status": 418, "one": 1}
 
     it "uses process if not a finished":
         message_from_exc = MessageFromExc()
@@ -57,16 +57,17 @@ describe TestCase, "MessageFromExc":
         exc = mock.Mock(name="exc")
 
         with mock.patch.object(message_from_exc, "process", process):
-            self.assertIs(message_from_exc(exc_type, exc, tb), info)
+            assert message_from_exc(exc_type, exc, tb) is info
 
         process.assert_called_once_with(exc_type, exc, tb)
 
     it "creates an internal server error by default":
         info = MessageFromExc()(ValueError, ValueError("wat"), None)
-        self.assertEqual(
-            info,
-            {"status": 500, "error": "Internal Server Error", "error_code": "InternalServerError"},
-        )
+        assert info == {
+            "status": 500,
+            "error": "Internal Server Error",
+            "error_code": "InternalServerError",
+        }
 
 describe AsyncTestCase, "AsyncCatcher":
     async it "takes in the request, info and final":
@@ -74,16 +75,16 @@ describe AsyncTestCase, "AsyncCatcher":
         info = mock.Mock(name="info")
         final = mock.Mock(name="final")
         catcher = AsyncCatcher(request, info, final=final)
-        self.assertIs(catcher.request, request)
-        self.assertIs(catcher.info, info)
-        self.assertIs(catcher.final, final)
+        assert catcher.request is request
+        assert catcher.info is info
+        assert catcher.final is final
 
     async it "defaults final to None":
         request = mock.Mock(name="request")
         info = mock.Mock(name="info")
         catcher = AsyncCatcher(request, info)
-        self.assertIs(catcher.info, info)
-        self.assertIs(catcher.final, None)
+        assert catcher.info is info
+        assert catcher.final is None
 
     describe "Behaviour":
         async before_each:
@@ -98,7 +99,7 @@ describe AsyncTestCase, "AsyncCatcher":
             with mock.patch.object(self.catcher, "complete", fake_complete):
                 async with self.catcher:
                     self.info["result"] = result
-                    self.assertEqual(len(fake_complete.mock_calls), 0)
+                    assert len(fake_complete.mock_calls) == 0
 
             fake_complete.assert_called_once_with(result, status=200)
 
@@ -112,8 +113,8 @@ describe AsyncTestCase, "AsyncCatcher":
 
             with mock.patch.object(self.catcher, "complete", fake_complete):
                 async with self.catcher:
-                    self.assertEqual(len(fake_complete.mock_calls), 0)
-                    self.assertEqual(len(self.request.message_from_exc.mock_calls), 0)
+                    assert len(fake_complete.mock_calls) == 0
+                    assert len(self.request.message_from_exc.mock_calls) == 0
                     raise error
 
             fake_complete.assert_called_once_with(
@@ -169,7 +170,7 @@ describe AsyncTestCase, "AsyncCatcher":
                 msg = mock.Mock(name="msg")
                 self.request._finished = True
                 self.catcher.send_msg(msg)
-                self.assertEqual(len(self.request.send_msg.mock_calls), 0)
+                assert len(self.request.send_msg.mock_calls) == 0
 
             async it "uses request.send_msg if final is None":
                 msg = mock.Mock(name="msg")
@@ -187,5 +188,5 @@ describe AsyncTestCase, "AsyncCatcher":
                 self.catcher.final = final
 
                 self.catcher.send_msg(msg, exc_info=self.exc_info)
-                self.assertEqual(len(self.request.send_msg.mock_calls), 0)
+                assert len(self.request.send_msg.mock_calls) == 0
                 final.assert_called_once_with(msg, exc_info=self.exc_info)

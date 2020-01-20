@@ -7,10 +7,10 @@ from unittest import TestCase, mock
 describe TestCase, "ProgressMessageMaker":
     it "can get a logger name":
         maker = ProgressMessageMaker()
-        self.assertEqual(maker.logger_name, "tests.request_handlers.command.test_progress_cb")
+        assert maker.logger_name == "tests.request_handlers.command.test_progress_cb"
 
         maker = ProgressMessageMaker(1)
-        self.assertEqual(maker.logger_name, "unittest.case")
+        assert maker.logger_name == "unittest.case"
 
     it "uses make_info":
         a = mock.Mock(name="a")
@@ -23,10 +23,10 @@ describe TestCase, "ProgressMessageMaker":
 
         maker = ProgressMessageMaker()
         with mock.patch.multiple(maker, make_info=make_info, do_log=do_log):
-            self.assertIs(maker(body, message, do_log=False, a=a), info)
+            assert maker(body, message, do_log=False, a=a) is info
 
         make_info.assert_called_once_with(body, message, a=a)
-        self.assertEqual(len(do_log.mock_calls), 0)
+        assert len(do_log.mock_calls) == 0
 
     it "uses do_log if we ask it to":
         a = mock.Mock(name="a")
@@ -39,7 +39,7 @@ describe TestCase, "ProgressMessageMaker":
 
         maker = ProgressMessageMaker()
         with mock.patch.multiple(maker, make_info=make_info, do_log=do_log):
-            self.assertIs(maker(body, message, do_log=True, a=a), info)
+            assert maker(body, message, do_log=True, a=a) is info
 
         make_info.assert_called_once_with(body, message, a=a)
         do_log.assert_called_once_with(body, message, info, a=a)
@@ -50,7 +50,7 @@ describe TestCase, "ProgressMessageMaker":
             error = ValueError("NOPE")
             body = mock.Mock(name="body")
             info = ProgressMessageMaker().make_info(body, error, a=a)
-            self.assertEqual(info, {"error_code": "ValueError", "error": "NOPE", "a": a})
+            assert info == {"error_code": "ValueError", "error": "NOPE", "a": a}
 
         it "converts exceptions with an as_dict":
             b = mock.Mock(name="b")
@@ -63,30 +63,30 @@ describe TestCase, "ProgressMessageMaker":
 
             body = mock.Mock(name="body")
             info = ProgressMessageMaker().make_info(body, error, b=b)
-            self.assertEqual(info, {"error_code": "BadThings", "error": {"one": 1}, "b": b})
+            assert info == {"error_code": "BadThings", "error": {"one": 1}, "b": b}
 
         it "converts message of None to done True":
             c = mock.Mock(name="c")
             body = mock.Mock(name="body")
             info = ProgressMessageMaker().make_info(body, None, c=c)
-            self.assertEqual(info, {"done": True, "c": c})
+            assert info == {"done": True, "c": c}
 
         it "passes dictionary through as is and with kwargs":
             d = mock.Mock(name="d")
             body = mock.Mock(name="body")
             message = {"one": "two"}
             info = ProgressMessageMaker().make_info(body, message)
-            self.assertEqual(info, {"one": "two"})
+            assert info == {"one": "two"}
 
             info = ProgressMessageMaker().make_info(body, message, d=d)
-            self.assertEqual(info, {"one": "two", "d": d})
+            assert info == {"one": "two", "d": d}
 
             # and doesn't modify the original
-            self.assertEqual(message, {"one": "two"})
+            assert message == {"one": "two"}
 
         it "pass through message as info otherwise":
             d = mock.Mock(name="d")
             body = mock.Mock(name="body")
             message = mock.Mock(name="message")
             info = ProgressMessageMaker().make_info(body, message, d=d)
-            self.assertEqual(info, {"info": message, "d": d})
+            assert info == {"info": message, "d": d}

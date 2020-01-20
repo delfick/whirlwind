@@ -27,7 +27,7 @@ describe AsyncHTTPTestCase, "Simple without error":
                 else:
                     response = self.fetch("/", method=method, body=body)
 
-            self.assertEqual(response.code, 405)
+            assert response.code == 405
 
     describe "Uses reprer":
 
@@ -59,17 +59,15 @@ describe AsyncHTTPTestCase, "Simple without error":
 
         it "works":
             response = self.fetch(self.path)
-            self.assertEqual(response.code, 200)
-            self.assertEqual(
-                json.loads(response.body.decode()), {"thing": {"special": "|<>THING<>|"}}
-            )
+            assert response.code == 200
+            assert json.loads(response.body.decode()) == {"thing": {"special": "|<>THING<>|"}}
 
             response = self.fetch(self.path, method="POST", body=json.dumps({"one": True}))
-            self.assertEqual(response.code, 200)
-            self.assertEqual(
-                json.loads(response.body.decode()),
-                {"thing": {"special": "|<>THING<>|"}, "body": {"one": True}},
-            )
+            assert response.code == 200
+            assert json.loads(response.body.decode()) == {
+                "thing": {"special": "|<>THING<>|"},
+                "body": {"one": True},
+            }
 
     describe "With Get":
 
@@ -79,17 +77,17 @@ describe AsyncHTTPTestCase, "Simple without error":
 
             class FilledSimple(Simple):
                 async def do_get(s, *, one, two):
-                    self.assertEqual(one, "one")
-                    self.assertEqual(two, "two")
-                    self.assertEqual(s.request.path, "/info/blah/one/two")
+                    assert one == "one"
+                    assert two == "two"
+                    assert s.request.path == "/info/blah/one/two"
                     return self.result
 
             return tornado.web.Application([("/info/blah/(?P<one>.*)/(?P<two>.*)", FilledSimple)])
 
         it "allows GET requests":
             response = self.fetch(self.path)
-            self.assertEqual(response.code, 200)
-            self.assertEqual(response.body, self.result.encode())
+            assert response.code == 200
+            assert response.body == self.result.encode()
 
     describe "With Post":
 
@@ -100,18 +98,18 @@ describe AsyncHTTPTestCase, "Simple without error":
 
             class FilledSimple(Simple):
                 async def do_post(s, one, two):
-                    self.assertEqual(one, "one")
-                    self.assertEqual(two, "two")
-                    self.assertEqual(s.request.path, "/info/blah/one/two")
-                    self.assertEqual(s.request.body, self.body.encode())
+                    assert one == "one"
+                    assert two == "two"
+                    assert s.request.path == "/info/blah/one/two"
+                    assert s.request.body == self.body.encode()
                     return self.result
 
             return tornado.web.Application([("/info/blah/(.*)/(.*)", FilledSimple)])
 
         it "allows POST requests":
             response = self.fetch(self.path, method="POST", body=self.body)
-            self.assertEqual(response.code, 200)
-            self.assertEqual(response.body, self.result.encode())
+            assert response.code == 200
+            assert response.body == self.result.encode()
 
     describe "With Put":
 
@@ -122,18 +120,18 @@ describe AsyncHTTPTestCase, "Simple without error":
 
             class FilledSimple(Simple):
                 async def do_put(s, *, one, two):
-                    self.assertEqual(one, "one")
-                    self.assertEqual(two, "two")
-                    self.assertEqual(s.request.path, "/info/blah/one/two")
-                    self.assertEqual(s.request.body, self.body.encode())
+                    assert one == "one"
+                    assert two == "two"
+                    assert s.request.path == "/info/blah/one/two"
+                    assert s.request.body == self.body.encode()
                     return self.result
 
             return tornado.web.Application([("/info/blah/(?P<one>.*)/(?P<two>.*)", FilledSimple)])
 
         it "allows PUT requests":
             response = self.fetch(self.path, method="PUT", body=self.body)
-            self.assertEqual(response.code, 200)
-            self.assertEqual(response.body, self.result.encode())
+            assert response.code == 200
+            assert response.body == self.result.encode()
 
     describe "With Patch":
 
@@ -144,18 +142,18 @@ describe AsyncHTTPTestCase, "Simple without error":
 
             class FilledSimple(Simple):
                 async def do_patch(s, one, two):
-                    self.assertEqual(one, "one")
-                    self.assertEqual(two, "two")
-                    self.assertEqual(s.request.path, "/info/blah/one/two")
-                    self.assertEqual(s.request.body, self.body.encode())
+                    assert one == "one"
+                    assert two == "two"
+                    assert s.request.path == "/info/blah/one/two"
+                    assert s.request.body == self.body.encode()
                     return self.result
 
             return tornado.web.Application([("/info/blah/(.*)/(.*)", FilledSimple)])
 
         it "allows PATCH requests":
             response = self.fetch(self.path, method="PATCH", body=self.body)
-            self.assertEqual(response.code, 200)
-            self.assertEqual(response.body, self.result.encode())
+            assert response.code == 200
+            assert response.body == self.result.encode()
 
     describe "With Delete":
 
@@ -165,17 +163,17 @@ describe AsyncHTTPTestCase, "Simple without error":
 
             class FilledSimple(Simple):
                 async def do_delete(s, *, one, two):
-                    self.assertEqual(one, "one")
-                    self.assertEqual(two, "two")
-                    self.assertEqual(s.request.path, "/info/blah/one/two")
+                    assert one == "one"
+                    assert two == "two"
+                    assert s.request.path == "/info/blah/one/two"
                     return self.result
 
             return tornado.web.Application([("/info/blah/(?P<one>.*)/(?P<two>.*)", FilledSimple)])
 
         it "allows DELETE requests":
             response = self.fetch(self.path, method="DELETE")
-            self.assertEqual(response.code, 200)
-            self.assertEqual(response.body, self.result.encode())
+            assert response.code == 200
+            assert response.body == self.result.encode()
 
 # This is so the send_msg logic in AsyncCatcher works
 describe AsyncHTTPTestCase, "no ws_connection object":
@@ -195,18 +193,17 @@ describe AsyncHTTPTestCase, "no ws_connection object":
 
     it "ha no ws_connection":
         response = self.fetch(self.path)
-        self.assertEqual(json.loads(response.body.decode()), {"other": "stuff"})
+        assert json.loads(response.body.decode()) == {"other": "stuff"}
         assert self.f.done()
 
 describe AsyncHTTPTestCase, "Simple with error":
 
     def assert_correct_response(self, response, status, body):
-        self.assertEqual(response.code, status)
-        self.assertEqual(
-            json.dumps(body, sort_keys=True),
-            json.dumps(json.loads(response.body.decode()), sort_keys=True),
+        assert response.code == status
+        assert json.dumps(body, sort_keys=True) == json.dumps(
+            json.loads(response.body.decode()), sort_keys=True
         )
-        self.assertEqual(response.headers["Content-Type"], "application/json; charset=UTF-8")
+        assert response.headers["Content-Type"] == "application/json; charset=UTF-8"
 
     describe "With Get":
 
@@ -216,7 +213,7 @@ describe AsyncHTTPTestCase, "Simple with error":
 
             class FilledSimple(Simple):
                 async def do_get(s):
-                    self.assertEqual(s.request.path, "/info/blah")
+                    assert s.request.path == "/info/blah"
                     raise Finished(status=501, reason=self.reason)
 
             return tornado.web.Application([(self.path, FilledSimple)])
@@ -236,8 +233,8 @@ describe AsyncHTTPTestCase, "Simple with error":
 
             class FilledSimple(Simple):
                 async def do_post(s):
-                    self.assertEqual(s.request.path, "/info/blah")
-                    self.assertEqual(s.request.body, self.body.encode())
+                    assert s.request.path == "/info/blah"
+                    assert s.request.body == self.body.encode()
                     raise Finished(status=501, reason=self.reason)
 
             return tornado.web.Application([(self.path, FilledSimple)])
@@ -257,8 +254,8 @@ describe AsyncHTTPTestCase, "Simple with error":
 
             class FilledSimple(Simple):
                 async def do_put(s):
-                    self.assertEqual(s.request.path, "/info/blah")
-                    self.assertEqual(s.request.body, self.body.encode())
+                    assert s.request.path == "/info/blah"
+                    assert s.request.body == self.body.encode()
                     raise Finished(status=501, reason=self.reason)
 
             return tornado.web.Application([(self.path, FilledSimple)])
@@ -278,8 +275,8 @@ describe AsyncHTTPTestCase, "Simple with error":
 
             class FilledSimple(Simple):
                 async def do_patch(s):
-                    self.assertEqual(s.request.path, "/info/blah")
-                    self.assertEqual(s.request.body, self.body.encode())
+                    assert s.request.path == "/info/blah"
+                    assert s.request.body == self.body.encode()
                     raise Finished(status=501, reason=self.reason)
 
             return tornado.web.Application([(self.path, FilledSimple)])
@@ -298,7 +295,7 @@ describe AsyncHTTPTestCase, "Simple with error":
 
             class FilledSimple(Simple):
                 async def do_delete(s):
-                    self.assertEqual(s.request.path, "/info/blah")
+                    assert s.request.path == "/info/blah"
                     raise Finished(status=501, reason=self.reason)
 
             return tornado.web.Application([(self.path, FilledSimple)])

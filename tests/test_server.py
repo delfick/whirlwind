@@ -101,7 +101,7 @@ describe thp.AsyncTestCase, "setup":
 
                 self.FakeHTTPServer.assert_called_once_with(self.application)
                 self.http_server.listen.assert_called_once_with(self.port, self.host)
-                self.test.assertEqual(len(self.http_server.stop.mock_calls), 0)
+                assert len(self.http_server.stop.mock_calls) == 0
 
                 self.final_future.cancel()
                 await asyncio.sleep(0.1)

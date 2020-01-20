@@ -81,14 +81,14 @@ describe thp.AsyncTestCase, "Commander":
             "/v1", {"command": "thing", "args": {"value": value}}
         )
 
-        self.assertEqual(val, value)
+        assert val == value
 
-        self.assertIs(thing.other, other)
-        self.assertIs(thing.commander, commander)
-        self.assertIs(thing.progress_cb, progress_cb)
-        self.assertIs(thing.request_handler, request_handler)
-        self.assertEqual(thing.path, "/v1")
-        self.assertIs(thing.store, store)
+        assert thing.other is other
+        assert thing.commander is commander
+        assert thing.progress_cb is progress_cb
+        assert thing.request_handler is request_handler
+        assert thing.path == "/v1"
+        assert thing.store is store
 
         assert thing.request_future.done()
 
@@ -105,14 +105,14 @@ describe thp.AsyncTestCase, "Commander":
             "/v1", {"command": "thing_caller", "args": {"passon": value}}
         )
 
-        self.assertEqual(val, f"called! {value}")
+        assert val == f"called! {value}"
 
-        self.assertIs(thing.other, other2)
-        self.assertIs(thing.commander, commander)
-        self.assertIs(thing.progress_cb, progress_cb)
-        self.assertIs(thing.request_handler, request_handler)
-        self.assertEqual(thing.path, "/v1")
-        self.assertIs(thing.store, store)
+        assert thing.other is other2
+        assert thing.commander is commander
+        assert thing.progress_cb is progress_cb
+        assert thing.request_handler is request_handler
+        assert thing.path == "/v1"
+        assert thing.store is store
 
         assert thing.request_future.done()
 
@@ -147,10 +147,10 @@ describe thp.AsyncTestCase, "Commander":
             )
             assert False, "expected an error"
         except BadSpecValue as error:
-            self.assertEqual(len(error.errors), 1)
+            assert len(error.errors) == 1
             error = error.errors[0]
             assert isinstance(error, BadSpecValue)
-            self.assertEqual(error.message, "Expected an integer")
+            assert error.message == "Expected an integer"
 
     @thp.with_timeout
     async it "injected fields do not come from args":
@@ -179,13 +179,13 @@ describe thp.AsyncTestCase, "Commander":
         got = await commander.executor(progress_cb, request_handler).execute(
             "/v1", {"command": "injected_values_can_be_nullable"}
         )
-        self.assertEqual(got, {"optional": None})
+        assert got == {"optional": None}
 
         value = str(uuid.uuid4())
         got2 = await commander.executor(progress_cb, request_handler, optional=value).execute(
             "/v1", {"command": "injected_values_can_be_nullable"}
         )
-        self.assertEqual(got2, {"optional": value})
+        assert got2 == {"optional": value}
 
     @thp.with_timeout
     async it "can override values":
@@ -202,10 +202,10 @@ describe thp.AsyncTestCase, "Commander":
             "/v1", {"command": "thing", "args": {"value": value}}, {"other": other2}
         )
 
-        self.assertEqual(val, value)
-        self.assertIs(thing.other, other2)
-        self.assertIs(thing.store, store2)
-        self.assertIsNot(store, store2)
+        assert val == value
+        assert thing.other is other2
+        assert thing.store is store2
+        assert store is not store2
 
     @thp.with_timeout
     async it "can inject values that are dictobj's":
@@ -223,5 +223,5 @@ describe thp.AsyncTestCase, "Commander":
             "/v1", {"command": "thing", "args": {"value": value}}
         )
 
-        self.assertEqual(val, value)
-        self.assertIs(thing.other, other)
+        assert val == value
+        assert thing.other is other

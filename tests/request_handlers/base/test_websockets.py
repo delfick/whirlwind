@@ -57,10 +57,10 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                     {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id},
                 )
                 res = await server.ws_read(connection)
-                self.assertEqual(res, {"reply": "blah", "message_id": message_id})
+                assert res == {"reply": "blah", "message_id": message_id}
 
                 connection.close()
-                self.assertIs(await server.ws_read(connection), None)
+                assert await server.ws_read(connection) is None
 
         await self.wait_for(doit())
 
@@ -84,17 +84,15 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                     {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id},
                 )
                 res = await server.ws_read(connection)
-                self.assertEqual(
-                    res, {"reply": {"progress": {"hello": "there"}}, "message_id": message_id}
-                )
+                assert res == {"reply": {"progress": {"hello": "there"}}, "message_id": message_id}
 
                 await asyncio.sleep(0.001)
                 assert not done.done()
 
                 connection.close()
-                self.assertIs(await server.ws_read(connection), None)
+                assert await server.ws_read(connection) is None
 
-            self.assertIs(await done, True)
+            assert await done is True
 
         await self.wait_for(doit())
 
@@ -121,13 +119,13 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                 "message": "WAT",
                 "kwargs": {"arg": 1, "do_log": False, "stack_extra": 1},
             }
-            self.assertEqual(res, {"reply": {"progress": progress}, "message_id": message_id})
+            assert res == {"reply": {"progress": progress}, "message_id": message_id}
 
             res = await server.ws_read(connection)
-            self.assertEqual(res, {"reply": "blah", "message_id": message_id})
+            assert res == {"reply": "blah", "message_id": message_id}
 
             connection.close()
-            self.assertIs(await server.ws_read(connection), None)
+            assert await server.ws_read(connection) is None
 
     @thp.with_timeout
     async it "can yield 0 progress messages if we so desire":
@@ -151,19 +149,19 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
             await server.ws_write(connection, msg)
 
             async def assertProgress(expect):
-                self.assertEqual(
-                    await server.ws_read(connection),
-                    {"reply": {"progress": expect}, "message_id": message_id},
-                )
+                assert await server.ws_read(connection) == {
+                    "reply": {"progress": expect},
+                    "message_id": message_id,
+                }
 
             await assertProgress("hello")
             await assertProgress("there")
 
             res = await server.ws_read(connection)
-            self.assertEqual(res, {"reply": "blah", "message_id": message_id})
+            assert res == {"reply": "blah", "message_id": message_id}
 
             connection.close()
-            self.assertIs(await server.ws_read(connection), None)
+            assert await server.ws_read(connection) is None
 
     @thp.with_timeout
     async it "can yield multiple progress messages if we so desire":
@@ -184,19 +182,19 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
             await server.ws_write(connection, msg)
 
             async def assertProgress(expect):
-                self.assertEqual(
-                    await server.ws_read(connection),
-                    {"reply": {"progress": expect}, "message_id": message_id},
-                )
+                assert await server.ws_read(connection) == {
+                    "reply": {"progress": expect},
+                    "message_id": message_id,
+                }
 
             await assertProgress("hello")
             await assertProgress("people")
 
             res = await server.ws_read(connection)
-            self.assertEqual(res, {"reply": "blah", "message_id": message_id})
+            assert res == {"reply": "blah", "message_id": message_id}
 
             connection.close()
-            self.assertIs(await server.ws_read(connection), None)
+            assert await server.ws_read(connection) is None
 
     @thp.with_timeout
     async it "calls the message_done callback":
@@ -219,19 +217,19 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
             msg = {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
             await server.ws_write(connection, msg)
 
-            self.assertEqual(
-                await server.ws_read(connection),
-                {"reply": {"progress": "hello"}, "message_id": message_id},
-            )
+            assert await server.ws_read(connection) == {
+                "reply": {"progress": "hello"},
+                "message_id": message_id,
+            }
 
             res = await server.ws_read(connection)
-            self.assertEqual(res, {"reply": "blah", "message_id": message_id})
+            assert res == {"reply": "blah", "message_id": message_id}
 
             assert info["message_key"] is not None
-            self.assertEqual(called, ["process", (msg, "blah", info["message_key"], None)])
+            assert called == ["process", (msg, "blah", info["message_key"], None)]
 
             connection.close()
-            self.assertIs(await server.ws_read(connection), None)
+            assert await server.ws_read(connection) is None
 
     @thp.with_timeout
     async it "calls the message_done with exc_info if an exception is raised in process_message":
@@ -255,10 +253,10 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
             msg = {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
             await server.ws_write(connection, msg)
 
-            self.assertEqual(
-                await server.ws_read(connection),
-                {"reply": {"progress": "hello"}, "message_id": message_id},
-            )
+            assert await server.ws_read(connection) == {
+                "reply": {"progress": "hello"},
+                "message_id": message_id,
+            }
 
             res = await server.ws_read(connection)
             reply = {
@@ -266,7 +264,7 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                 "error_code": "InternalServerError",
                 "status": 500,
             }
-            self.assertEqual(res, {"reply": reply, "message_id": message_id})
+            assert res == {"reply": reply, "message_id": message_id}
 
             assert info["message_key"] is not None
 
@@ -274,13 +272,13 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                 def __eq__(self, other):
                     return isinstance(other, types.TracebackType)
 
-            self.assertEqual(
-                called,
-                ["process", (msg, reply, info["message_key"], (ValueError, error, ATraceback()))],
-            )
+            assert called == [
+                "process",
+                (msg, reply, info["message_key"], (ValueError, error, ATraceback())),
+            ]
 
             connection.close()
-            self.assertIs(await server.ws_read(connection), None)
+            assert await server.ws_read(connection) is None
 
     @thp.with_timeout
     async it "message_done can be used to close the connection":
@@ -305,28 +303,28 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
             msg = {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
             await server.ws_write(connection, msg)
 
-            self.assertEqual(
-                await server.ws_read(connection),
-                {"reply": {"progress": "there"}, "message_id": message_id},
-            )
+            assert await server.ws_read(connection) == {
+                "reply": {"progress": "there"},
+                "message_id": message_id,
+            }
 
             res = await server.ws_read(connection)
-            self.assertEqual(res, {"reply": {"one": "two"}, "message_id": message_id})
+            assert res == {"reply": {"one": "two"}, "message_id": message_id}
 
             assert info["message_key"] is not None
 
-            self.assertEqual(called, ["process", (msg, {"one": "two"}, info["message_key"], None)])
+            assert called == ["process", (msg, {"one": "two"}, info["message_key"], None)]
 
-            self.assertIs(await server.ws_read(connection), None)
+            assert await server.ws_read(connection) is None
 
     async it "modifies ws_connection object":
 
         class Handler(SimpleWebSocketBase):
             async def process_message(s, path, body, message_id, message_key, progress_cb):
-                self.assertEqual(type(self.key), str)
-                self.assertEqual(len(self.key), 36)
-                self.assertNotEqual(message_id, message_key)
-                self.assertNotEqual(message_key, self.key)
+                assert type(self.key) == str
+                assert len(self.key) == 36
+                assert message_id != message_key
+                assert message_key != self.key
                 assert message_key in self.wsconnections
                 return "blah"
 
@@ -339,10 +337,10 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                     {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id},
                 )
                 res = await server.ws_read(connection)
-                self.assertEqual(server.wsconnections, {})
+                assert server.wsconnections == {}
 
                 connection.close()
-                self.assertIs(await server.ws_read(connection), None)
+                assert await server.ws_read(connection) is None
 
         await self.wait_for(doit())
 
@@ -367,11 +365,11 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                     {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id},
                 )
                 await self.wait_for(f1)
-                self.assertEqual(len(server.wsconnections), 1)
+                assert len(server.wsconnections) == 1
                 assert not f2.done()
 
-            self.assertEqual(len(server.wsconnections), 0)
-            self.assertEqual(f2.result(), True)
+            assert len(server.wsconnections) == 0
+            assert f2.result() == True
 
         await self.wait_for(doit())
 
@@ -380,8 +378,8 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
 
         class Handler(SimpleWebSocketBase):
             async def process_message(s, path, body, message_id, message_key, progress_cb):
-                self.assertEqual(path, "/one/two")
-                self.assertEqual(body, {"wat": mock.ANY})
+                assert path == "/one/two"
+                assert body == {"wat": mock.ANY}
                 message_info["keys"].add(s.key)
                 message_info["message_keys"].append(message_key)
                 return body["wat"]
@@ -396,31 +394,31 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                     {"path": "/one/two", "body": {"wat": "one"}, "message_id": message_id},
                 )
                 res = await server.ws_read(connection)
-                self.assertEqual(res["message_id"], message_id)
-                self.assertEqual(res["reply"], "one")
+                assert res["message_id"] == message_id
+                assert res["reply"] == "one"
 
                 await server.ws_write(
                     connection,
                     {"path": "/one/two", "body": {"wat": "two"}, "message_id": message_id},
                 )
                 res = await server.ws_read(connection)
-                self.assertEqual(res["message_id"], message_id)
-                self.assertEqual(res["reply"], "two")
+                assert res["message_id"] == message_id
+                assert res["reply"] == "two"
 
                 connection.close()
-                self.assertIs(await server.ws_read(connection), None)
+                assert await server.ws_read(connection) is None
 
         await self.wait_for(doit())
 
-        self.assertEqual(len(message_info["keys"]), 1)
-        self.assertEqual(len(message_info["message_keys"]), len(set(message_info["message_keys"])))
+        assert len(message_info["keys"]) == 1
+        assert len(message_info["message_keys"]) == len(set(message_info["message_keys"]))
 
     async it "can handle ticks for me":
 
         class Handler(SimpleWebSocketBase):
             async def process_message(s, path, body, message_id, message_key, progress_cb):
-                self.assertEqual(path, "/one/two")
-                self.assertEqual(body, {"wat": mock.ANY})
+                assert path == "/one/two"
+                assert body == {"wat": mock.ANY}
                 return body["wat"]
 
         async def doit():
@@ -430,19 +428,19 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                 connection = await server.ws_connect()
                 await server.ws_write(connection, {"path": "__tick__", "message_id": "__tick__"})
                 res = await server.ws_read(connection)
-                self.assertEqual(res["message_id"], "__tick__")
-                self.assertEqual(res["reply"], {"ok": "thankyou"})
+                assert res["message_id"] == "__tick__"
+                assert res["reply"] == {"ok": "thankyou"}
 
                 await server.ws_write(
                     connection,
                     {"path": "/one/two", "body": {"wat": "two"}, "message_id": message_id},
                 )
                 res = await server.ws_read(connection)
-                self.assertEqual(res["message_id"], message_id)
-                self.assertEqual(res["reply"], "two")
+                assert res["message_id"] == message_id
+                assert res["reply"] == "two"
 
                 connection.close()
-                self.assertIs(await server.ws_read(connection), None)
+                assert await server.ws_read(connection) is None
 
         await self.wait_for(doit())
 
@@ -476,12 +474,12 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                     await server.ws_write(connection, body)
                     res = await server.ws_read(connection)
                     assert res is not None, "Got no reply to : '{}'".format(body)
-                    self.assertEqual(res["message_id"], None)
+                    assert res["message_id"] == None
                     assert "reply" in res
                     assert "error" in res["reply"]
 
                 connection.close()
-                self.assertIs(await server.ws_read(connection), None)
+                assert await server.ws_read(connection) is None
 
         await self.wait_for(doit())
 
@@ -519,25 +517,25 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                     },
                 )
 
-                self.assertEqual(
-                    await server.ws_read(connection),
-                    {"message_id": msg_id1, "reply": {"progress": {"1": ["info", "start"]}}},
-                )
-                self.assertEqual(
-                    await server.ws_read(connection),
-                    {"message_id": msg_id2, "reply": {"progress": {"2": ["info", "start"]}}},
-                )
-                self.assertEqual(
-                    await server.ws_read(connection),
-                    {"message_id": msg_id2, "reply": {"processed": "2"}},
-                )
-                self.assertEqual(
-                    await server.ws_read(connection),
-                    {"message_id": msg_id1, "reply": {"processed": "1"}},
-                )
+                assert await server.ws_read(connection) == {
+                    "message_id": msg_id1,
+                    "reply": {"progress": {"1": ["info", "start"]}},
+                }
+                assert await server.ws_read(connection) == {
+                    "message_id": msg_id2,
+                    "reply": {"progress": {"2": ["info", "start"]}},
+                }
+                assert await server.ws_read(connection) == {
+                    "message_id": msg_id2,
+                    "reply": {"processed": "2"},
+                }
+                assert await server.ws_read(connection) == {
+                    "message_id": msg_id1,
+                    "reply": {"processed": "1"},
+                }
 
                 connection.close()
-                self.assertIs(await server.ws_read(connection), None)
+                assert await server.ws_read(connection) is None
 
         await self.wait_for(doit())
 
@@ -558,28 +556,30 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                 await server.ws_write(
                     connection, {"path": "/process", "body": {"close": False}, "message_id": msg_id}
                 )
-                self.assertEqual(
-                    await server.ws_read(connection), {"message_id": msg_id, "reply": "stillalive"}
-                )
+                assert await server.ws_read(connection) == {
+                    "message_id": msg_id,
+                    "reply": "stillalive",
+                }
 
                 msg_id = str(uuid.uuid1())
                 await server.ws_write(
                     connection, {"path": "/process", "body": {"close": False}, "message_id": msg_id}
                 )
-                self.assertEqual(
-                    await server.ws_read(connection), {"message_id": msg_id, "reply": "stillalive"}
-                )
+                assert await server.ws_read(connection) == {
+                    "message_id": msg_id,
+                    "reply": "stillalive",
+                }
 
                 msg_id = str(uuid.uuid1())
                 await server.ws_write(
                     connection, {"path": "/process", "body": {"close": True}, "message_id": msg_id}
                 )
-                self.assertEqual(
-                    await server.ws_read(connection),
-                    {"message_id": msg_id, "reply": {"closing": "goodbye"}},
-                )
+                assert await server.ws_read(connection) == {
+                    "message_id": msg_id,
+                    "reply": {"closing": "goodbye"},
+                }
 
-                self.assertIs(await server.ws_read(connection), None)
+                assert await server.ws_read(connection) is None
 
         await self.wait_for(doit())
 
@@ -607,12 +607,10 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                 await server.ws_write(
                     connection, {"path": "/process", "body": body, "message_id": msg_id}
                 )
-                self.assertEqual(
-                    await server.ws_read(connection), {"message_id": msg_id, "reply": body}
-                )
+                assert await server.ws_read(connection) == {"message_id": msg_id, "reply": body}
                 connection.close()
 
-                self.assertIs(await server.ws_read(connection), None)
+                assert await server.ws_read(connection) is None
 
         await self.wait_for(doit())
 
@@ -647,32 +645,26 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                 await server.ws_write(
                     connection, {"path": "/error", "body": {"error": "one"}, "message_id": msg_id}
                 )
-                self.assertEqual(
-                    await server.ws_read(connection),
-                    {
-                        "message_id": msg_id,
-                        "reply": {
-                            "error": "Internal Server Error",
-                            "error_code": "InternalServerError",
-                            "status": 500,
-                        },
+                assert await server.ws_read(connection) == {
+                    "message_id": msg_id,
+                    "reply": {
+                        "error": "Internal Server Error",
+                        "error_code": "InternalServerError",
+                        "status": 500,
                     },
-                )
+                }
 
                 msg_id2 = str(uuid.uuid1())
                 await server.ws_write(
                     connection, {"path": "/error", "body": {"error": "two"}, "message_id": msg_id2}
                 )
-                self.assertEqual(
-                    await server.ws_read(connection),
-                    {
-                        "message_id": msg_id2,
-                        "reply": {"error": {"error": "Try again"}, "error_code": "BadError"},
-                    },
-                )
+                assert await server.ws_read(connection) == {
+                    "message_id": msg_id2,
+                    "reply": {"error": {"error": "Try again"}, "error_code": "BadError"},
+                }
 
                 connection.close()
-                self.assertIs(await server.ws_read(connection), None)
+                assert await server.ws_read(connection) is None
 
         await self.wait_for(doit())
 
@@ -697,13 +689,13 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                 await server.ws_write(
                     connection, {"path": "/thing", "body": {}, "message_id": msg_id}
                 )
-                self.assertEqual(
-                    await server.ws_read(connection),
-                    {"message_id": msg_id, "reply": {"result": "", "value": "blah and stuff"}},
-                )
+                assert await server.ws_read(connection) == {
+                    "message_id": msg_id,
+                    "reply": {"result": "", "value": "blah and stuff"},
+                }
 
                 connection.close()
-                self.assertIs(await server.ws_read(connection), None)
+                assert await server.ws_read(connection) is None
 
         await self.wait_for(doit())
 
@@ -746,10 +738,10 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                 await server.ws_write(
                     connection, {"path": "/no_error", "body": {}, "message_id": msg_id}
                 )
-                self.assertEqual(
-                    await server.ws_read(connection),
-                    {"message_id": msg_id, "reply": {"success": True}},
-                )
+                assert await server.ws_read(connection) == {
+                    "message_id": msg_id,
+                    "reply": {"success": True},
+                }
 
                 ##################
                 ### INTERNAL_ERROR
@@ -758,17 +750,14 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                 await server.ws_write(
                     connection, {"path": "/internal_error", "body": {}, "message_id": msg_id}
                 )
-                self.assertEqual(
-                    await server.ws_read(connection),
-                    {
-                        "message_id": msg_id,
-                        "reply": {
-                            "error": "Internal Server Error",
-                            "error_code": "InternalServerError",
-                            "status": 500,
-                        },
+                assert await server.ws_read(connection) == {
+                    "message_id": msg_id,
+                    "reply": {
+                        "error": "Internal Server Error",
+                        "error_code": "InternalServerError",
+                        "status": 500,
                     },
-                )
+                }
 
                 ##################
                 ### CUSTOM RETURN
@@ -777,14 +766,14 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
                 await server.ws_write(
                     connection, {"path": "/custom_return", "body": {}, "message_id": msg_id}
                 )
-                self.assertEqual(
-                    await server.ws_read(connection),
-                    {"message_id": msg_id, "reply": {"progress": {"error": "progress"}}},
-                )
-                self.assertEqual(
-                    await server.ws_read(connection),
-                    {"message_id": msg_id, "reply": {"error": "Stuff", "status": 400}},
-                )
+                assert await server.ws_read(connection) == {
+                    "message_id": msg_id,
+                    "reply": {"progress": {"error": "progress"}},
+                }
+                assert await server.ws_read(connection) == {
+                    "message_id": msg_id,
+                    "reply": {"error": "Stuff", "status": 400},
+                }
 
         await self.wait_for(doit())
 
@@ -794,19 +783,16 @@ describe thp.AsyncTestCase, "SimpleWebSocketBase":
 
         self.maxDiff = None
 
-        self.assertEqual(
-            replies,
-            [
-                ({"success": True}, None),
-                (
-                    {
-                        "status": 500,
-                        "error": "Internal Server Error",
-                        "error_code": "InternalServerError",
-                    },
-                    (ValueError, error1, ATraceback()),
-                ),
-                ({"progress": {"error": "progress"}}, None),
-                ({"error": "Stuff", "status": 400}, (Finished, error2, None)),
-            ],
-        )
+        assert replies == [
+            ({"success": True}, None),
+            (
+                {
+                    "status": 500,
+                    "error": "Internal Server Error",
+                    "error_code": "InternalServerError",
+                },
+                (ValueError, error1, ATraceback()),
+            ),
+            ({"progress": {"error": "progress"}}, None),
+            ({"error": "Stuff", "status": 400}, (Finished, error2, None)),
+        ]
