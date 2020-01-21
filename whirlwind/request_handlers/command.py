@@ -99,7 +99,7 @@ class WSHandler(SimpleWebSocketBase, ProcessReplyMixin):
 
     def transform_progress(self, body, progress, stack_extra=0, **kwargs):
         maker = self.progress_maker(2 + stack_extra)
-        yield maker(body, progress, **kwargs)
+        yield {"progress": maker(body, progress, **kwargs)}
 
     async def process_message(self, path, body, message_id, message_key, progress_cb):
         try:

@@ -96,7 +96,7 @@ describe "SimpleWebSocketBase":
 
         class Handler(SimpleWebSocketBase):
             def transform_progress(s, body, message, **kwargs):
-                yield {"body": body, "message": message, "kwargs": kwargs}
+                yield {"progress": {"body": body, "message": message, "kwargs": kwargs}}
 
             async def process_message(s, path, body, message_id, message_key, progress_cb):
                 progress_cb("WAT", arg=1, do_log=False, stack_extra=1)
@@ -128,7 +128,7 @@ describe "SimpleWebSocketBase":
             def transform_progress(s, body, message, **kwargs):
                 if message == "ignore":
                     return
-                yield message
+                yield {"progress": message}
 
             async def process_message(s, path, body, message_id, message_key, progress_cb):
                 progress_cb("hello")
@@ -162,7 +162,7 @@ describe "SimpleWebSocketBase":
         class Handler(SimpleWebSocketBase):
             def transform_progress(s, body, message, **kwargs):
                 for m in message:
-                    yield m
+                    yield {"progress": m}
 
             async def process_message(s, path, body, message_id, message_key, progress_cb):
                 progress_cb(["hello", "people"])

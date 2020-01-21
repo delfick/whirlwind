@@ -367,7 +367,7 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
 
                 def progress_cb(progress, **kwargs):
                     for m in self.transform_progress(msg, progress, **kwargs):
-                        self.reply({"progress": m}, message_id=message_id)
+                        self.reply(m, message_id=message_id)
 
                 async with self.async_catcher(info, on_processed):
                     info["result"] = await self.process_message(
@@ -415,13 +415,13 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
         .. code-block:: python
 
             for m in self.transform_progress(<request>, "some message", arg=1):
-                # write ``{"reply": {"progress": m}, "message_id": <message_id>}``
+                # write ``{"reply": m, "message_id": <message_id>}``
 
         where ``<request>`` is the entire message that started this stream.
 
-        By default kwargs are ignored and we just yield ``progress`` once
+        By default kwargs are ignored and we just yield ``{"progress": progress}`` once
         """
-        yield progress
+        yield {"progress": progress}
 
     async def process_message(self, path, body, message_id, message_key, progress_cb):
         """

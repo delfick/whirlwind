@@ -6,6 +6,9 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
+0.7 - TBD
+    * Made transform_progress responsible for name spacing the progress messages
+
 0.6 - 18 September 2019
     * Migrated to `delfick_project <https://delfick-project.readthedocs.io/en/latest/index.html>`_
 
