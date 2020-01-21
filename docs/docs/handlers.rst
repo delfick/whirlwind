@@ -247,7 +247,7 @@ on your handler. For example:
               for thing in progress:
                   yield {"progress": progress, "kwargs": kwargs}
           else:
-              yield progress
+              yield {"progress": progress}
 
       async def process_message(self, path, body, message_id, message_key, progress_cb):
           # With transform_progress above this will generate no progress reply
