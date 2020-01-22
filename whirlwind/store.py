@@ -3,12 +3,41 @@ from whirlwind.commander import Command
 from delfick_project.norms import dictobj, sb, BadSpecValue
 from delfick_project.option_merge import NoFormat
 from collections import defaultdict
+import inspect
+
+
+def is_interactive(obj):
+    return (
+        obj and hasattr(obj, "execute") and "messages" in inspect.signature(obj.execute).parameters
+    )
 
 
 class NoSuchPath(Exception):
     def __init__(self, wanted, available):
         self.wanted = wanted
         self.available = available
+
+
+class NoSuchParent(Exception):
+    def __init__(self, wanted):
+        self.wanted = wanted
+
+        s = repr(self.wanted)
+        if hasattr(self.wanted, "__name__"):
+            s = self.wanted.__name__
+
+        super().__init__(self, f"Couldn't find parent specified by command: {s}")
+
+
+class NonInteractiveParent(Exception):
+    def __init__(self, wanted):
+        self.wanted = wanted
+
+        s = repr(self.wanted)
+        if hasattr(self.wanted, "__name__"):
+            s = self.wanted.__name__
+
+        super().__init__(self, f"Store commands can only specify an interactive parent: {s}")
 
 
 class Store:
@@ -71,13 +100,32 @@ class Store:
                     slash = "/"
                 self.paths[path][f"{new_prefix}{slash}{name}"] = options
 
-    def command(self, name, path=None):
+    def command(self, name, *, path=None, parent=None):
         path = self.normalise_path(path)
 
         def decorator(kls):
             kls.__whirlwind_command__ = True
+            kls.__whirlwind_ws_only__ = is_interactive(kls) or parent
+
+            n = name
             spec = kls.FieldSpec(formatter=self.formatter)
-            self.paths[path][f"{self.prefix}{name}"] = {"kls": kls, "spec": spec}
+
+            if parent and not is_interactive(parent):
+                raise NonInteractiveParent(parent)
+            elif parent:
+                found = False
+                for p, o in self.paths[path].items():
+                    if o["kls"] is parent:
+                        n = f"{p}:{name}"
+                        found = True
+                        break
+
+                if not found:
+                    raise NoSuchParent(parent)
+            else:
+                n = f"{self.prefix}{n}"
+
+            self.paths[path][n] = {"kls": kls, "spec": spec}
             return kls
 
         return decorator

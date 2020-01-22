@@ -1,9 +1,10 @@
 # coding: spec
 
-from whirlwind.store import Store, NoSuchPath
+from whirlwind.store import Store, NoSuchPath, NoSuchParent, NonInteractiveParent
 
 from delfick_project.option_merge import MergedOptionStringFormatter
 from delfick_project.norms import dictobj, sb, Meta, BadSpecValue
+from delfick_project.errors_pytest import assertRaises
 from unittest import mock
 import uuid
 
@@ -220,9 +221,95 @@ describe "Store":
                 "/v2": {"stuff": {"kls": Stuff, "spec": Spec3()}},
             }
 
-            assert Thing.__whirlwind_command__
-            assert Other.__whirlwind_command__
-            assert Stuff.__whirlwind_command__
+            for kls in (Thing, Other, Stuff):
+                assert kls.__whirlwind_command__
+                assert not kls.__whirlwind_ws_only__
+
+        it "works with interactive commands":
+            store = Store()
+
+            class Spec:
+                def __init__(s, kls):
+                    s.kls = kls
+
+                def __eq__(s, other):
+                    s.normalised = other.empty_normalise()
+                    assert isinstance(s.normalised, s.kls)
+                    assert s.normalised == {}
+                    return True
+
+            @store.command("interactive1")
+            class Interactive1(store.Command):
+                def execute(self, messages):
+                    pass
+
+            @store.command("interactive2", parent=Interactive1)
+            class Interactive2(store.Command):
+                def execute(self, messages):
+                    pass
+
+            @store.command("command1", parent=Interactive1)
+            class Command1(store.Command):
+                pass
+
+            @store.command("command2", parent=Interactive2)
+            class Command2(store.Command):
+                pass
+
+            got = dict(store.paths)
+            want = {
+                "/v1": {
+                    "interactive1": {"kls": Interactive1, "spec": Spec(Interactive1)},
+                    "interactive1:interactive2": {"kls": Interactive2, "spec": Spec(Interactive2)},
+                    "interactive1:interactive2:command2": {"kls": Command2, "spec": Spec(Command2)},
+                    "interactive1:command1": {"kls": Command1, "spec": Spec(Command1)},
+                },
+            }
+
+            assert got == want
+
+            for kls in (Interactive1, Interactive2, Command1, Command2):
+                assert kls.__whirlwind_command__
+                assert kls.__whirlwind_ws_only__
+
+        it "complains if can't find the parent":
+            store = Store()
+
+            class W:
+                def execute(self, messages):
+                    pass
+
+            with assertRaises(NoSuchParent, "Couldn't find parent specified by command: W"):
+
+                @store.command("command", parent=W)
+                class Command(store.Command):
+                    pass
+
+        it "complains if parent is not interactive":
+            store = Store()
+
+            class W:
+                def execute(self):
+                    pass
+
+            with assertRaises(
+                NonInteractiveParent, "Store commands can only specify an interactive parent: W"
+            ):
+
+                @store.command("command", parent=W)
+                class Command(store.Command):
+                    pass
+
+            class W:
+                pass
+
+            with assertRaises(
+                NonInteractiveParent, "Store commands can only specify an interactive parent: W"
+            ):
+
+                @store.command("command", parent=W)
+                class Command(store.Command):
+                    pass
 
     describe "command_spec":
         it "normalises args into the spec for the correct object":

@@ -8,6 +8,11 @@ Changlog
 
 0.7 - TBD
     * Made transform_progress responsible for name spacing the progress messages
+    * Store commands can now be interactive. If you define the execute method as
+      taking in ``messages``, then you can process extra messages sent to that
+      command. You then define what messages it accepts by using the
+      ``store.command`` decorator with the ``parent`` option as the interactive
+      command.
 
 0.6 - 18 September 2019
     * Migrated to `delfick_project <https://delfick-project.readthedocs.io/en/latest/index.html>`_
