@@ -107,6 +107,60 @@ class ProcessItem:
             return task
 
 
+class MessageHolder:
+    def __init__(self, command, final_future):
+        self.ts = []
+        self.command = command
+        self.queue = asyncio.Queue()
+        self.final_future = final_future
+
+    def add_main_task(self, main_task):
+        self.main_task = main_task
+
+    async def finish(self, cancelled=False):
+        exception = None
+        if hasattr(self, "main_task") and self.main_task.done():
+            if self.main_task.cancelled():
+                cancelled = True
+            elif self.main_task.exception():
+                exception = self.main_task.exception()
+
+        if self.ts:
+            for t, do_cancel, do_transfer in self.ts:
+                if do_transfer and exception and not t.done():
+                    t.set_exception(exception)
+                if cancelled or do_cancel:
+                    t.cancel()
+            await asyncio.wait([t for t, _, _ in self.ts])
+
+    async def add(self, fut, command, execute=None):
+        fut.add_done_callback(retrieve_exception)
+        self.ts.append((fut, False, True))
+
+        await self.queue.put(ProcessItem(fut, command, execute, self))
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        while True:
+            getter = asyncio.get_event_loop().create_task(
+                self.queue.get(), name=f"<queue.get: {self.command.__class__.__name__}>"
+            )
+            self.ts.append((getter, True, False))
+            await asyncio.wait([getter, self.final_future], return_when=asyncio.FIRST_COMPLETED)
+            self.ts = [i for i in self.ts if not i[0].done()]
+
+            if self.final_future.done():
+                getter.cancel()
+                await asyncio.wait([getter])
+                raise StopAsyncIteration
+
+            nxt = await getter
+            if nxt is not None:
+                return nxt
+
+
 class command_spec(sb.Spec):
     """
     Knows how to turn ``{"path": <string>, "body": {"command": <string>, "args": <dict>}}``
