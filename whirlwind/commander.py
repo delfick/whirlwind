@@ -40,7 +40,7 @@ class Executor:
         self.extra_options = extra_options
         self.request_handler = request_handler
 
-    async def execute(self, path, body, extra_options=None):
+    async def execute(self, path, body, extra_options=None, allow_ws_only=False):
         """
         Responsible for creating a command and calling execute on it.
 
@@ -88,7 +88,7 @@ class Executor:
 
             meta = Meta(everything, self.commander.meta.path).at("<input>")
             execute = self.commander.store.command_spec.normalise(
-                meta, {"path": path, "body": body}
+                meta, {"path": path, "body": body, "allow_ws_only": allow_ws_only}
             )
 
             return await execute()

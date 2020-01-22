@@ -174,9 +174,12 @@ class command_spec(sb.Spec):
         self.existing_commands = {}
 
     def make_command(self, meta, val, existing):
-        v = sb.set_options(path=sb.required(sb.string_spec())).normalise(meta, val)
+        v = sb.set_options(
+            path=sb.required(sb.string_spec()), allow_ws_only=sb.defaulted(sb.boolean(), False)
+        ).normalise(meta, val)
 
         path = v["path"]
+        allow_ws_only = v["allow_ws_only"]
 
         if path not in self.paths:
             raise NoSuchPath(path, sorted(self.paths))
@@ -193,16 +196,6 @@ class command_spec(sb.Spec):
         if existing:
             name = val["body"]["command"] = f"{existing['path']}:{name}"
 
-        available_commands = self.paths[path]
-
-        if name not in available_commands:
-            raise BadSpecValue(
-                "Unknown command",
-                wanted=name,
-                available=sorted(available_commands),
-                meta=meta.at("body").at("command"),
-            )
-
         extra_context = {}
         if existing:
             extra_context["_parent_command"] = existing["command"]
@@ -210,12 +203,38 @@ class command_spec(sb.Spec):
         everything = meta.everything
         if isinstance(meta.everything, MergedOptions):
             everything = meta.everything.wrapped()
-
         everything.update(extra_context)
+        meta = Meta(everything, []).at("body")
 
-        meta = Meta(everything, []).at("body").at("args")
-        command = available_commands[name]["spec"].normalise(meta, args)
+        available_commands = self.paths[path]
+
+        if name not in available_commands:
+            raise BadSpecValue(
+                "Unknown command",
+                wanted=name,
+                available=self.available(available_commands, allow_ws_only=allow_ws_only),
+                meta=meta.at("command"),
+            )
+
+        command = available_commands[name]["spec"].normalise(meta.at("args"), args)
+
+        if not allow_ws_only and command.__whirlwind_ws_only__:
+            raise BadSpecValue(
+                "Command is for websockets only",
+                wanted=name,
+                available=self.available(available_commands, allow_ws_only=allow_ws_only),
+                meta=meta.at("command"),
+            )
+
         return command, name
+
+    def available(self, available_commands, *, allow_ws_only):
+        available = []
+        for name, info in available_commands.items():
+            if allow_ws_only or not info["kls"].__whirlwind_ws_only__:
+                available.append(name)
+
+        return sorted(available)
 
     def find_command(self, message_id):
         if isinstance(message_id, tuple) and len(message_id) == 1:
