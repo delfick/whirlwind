@@ -289,7 +289,9 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
 
     class WSMessage(dictobj.Spec):
         path = dictobj.Field(sb.string_spec, wrapper=sb.required)
-        message_id = dictobj.Field(sb.string_spec, wrapper=sb.required)
+        message_id = dictobj.Field(
+            sb.or_spec(sb.string_spec(), sb.tupleof(sb.string_spec())), wrapper=sb.required
+        )
         body = dictobj.Field(json_spec, wrapper=sb.required)
 
     message_spec = WSMessage.FieldSpec()
@@ -373,9 +375,14 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
                         self.reply(m, message_id=message_id)
 
                 async with self.async_catcher(info, on_processed):
-                    info["result"] = await self.process_message(
+                    result = await self.process_message(
                         path, body, message_id, message_key, progress_cb
                     )
+
+                    if isinstance(result, asyncio.Future) or hasattr(result, "__await__"):
+                        result = await result
+
+                    info["result"] = result
 
             def done(res):
                 if message_key in self.wsconnections:
@@ -386,7 +393,7 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
                     if exc:
                         log.exception(exc, exc_info=(type(exc), exc, exc.__traceback__))
 
-            t = asyncio.get_event_loop().create_task(doit())
+            t = asyncio.get_event_loop().create_task(doit(), name=f"<process_command: {body}>")
             t.add_done_callback(done)
             self.wsconnections[message_key] = t
 

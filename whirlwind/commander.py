@@ -85,10 +85,10 @@ class Executor:
             )
 
             meta = Meta(everything, self.commander.meta.path).at("<input>")
-            command = self.commander.store.command_spec.normalise(
+            execute = self.commander.store.command_spec.normalise(
                 meta, {"path": path, "body": body}
             )
 
-            return await command.execute()
+            return await execute()
         finally:
             request_future.cancel()
