@@ -305,6 +305,9 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
         self.hook("websocket_opened")
 
     def reply(self, msg, message_id=None, exc_info=None):
+        if msg is None:
+            msg = {"done": True}
+
         # I bypass tornado converting the dictionary so that non jsonable things can be repr'd
         if hasattr(msg, "as_dict"):
             msg = msg.as_dict()

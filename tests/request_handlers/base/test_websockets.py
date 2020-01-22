@@ -223,6 +223,37 @@ describe "SimpleWebSocketBase":
             connection.close()
             assert await server.runner.ws_read(connection) is None
 
+    async it "sends back done true if msg is None", make_wrapper:
+        info = {"message_key": None}
+        called = []
+
+        class Handler(SimpleWebSocketBase):
+            def message_done(s, request, final, message_key, exc_info=None):
+                called.append((request, final, message_key, exc_info))
+
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
+                info["message_key"] = message_key
+                called.append("process")
+                progress_cb("hello")
+
+        message_id = str(uuid.uuid1())
+        async with make_wrapper(Handler) as server:
+            connection = await server.runner.ws_connect()
+            msg = {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
+            await server.runner.ws_write(connection, msg)
+
+            assert await server.runner.ws_read(connection) == {
+                "reply": {"progress": "hello"},
+                "message_id": message_id,
+            }
+
+            assert len(server.wsconnections) == 0
+            assert info["message_key"] is not None
+            assert called == ["process", (msg, {"done": True}, info["message_key"], None)]
+
+            connection.close()
+            assert await server.runner.ws_read(connection) is None
+
     async it "calls the message_done with exc_info if an exception is raised in process_message", make_wrapper:
         info = {"message_key": None}
         error = ValueError("NOPE")
