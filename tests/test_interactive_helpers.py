@@ -1,6 +1,6 @@
 # coding: spec
 
-from whirlwind.store import pass_on_result, ProcessItem
+from whirlwind.store import pass_on_result, ProcessItem, MessageHolder
 
 from delfick_project.errors_pytest import assertRaises
 from unittest import mock
@@ -230,3 +230,289 @@ describe "ProcessItem":
             assert messages.ts == [(task, False, True)]
             assert (await task) is result
             assert (await fut) is result
+
+describe "MessageHolder":
+    it "takes in command and final_future":
+        command = mock.Mock(name="command")
+        final_future = asyncio.Future()
+
+        holder = MessageHolder(command, final_future)
+
+        assert holder.ts == []
+        assert holder.command is command
+        assert isinstance(holder.queue, asyncio.Queue)
+        assert holder.final_future is final_future
+
+    it "can be given a main_task":
+        holder = MessageHolder(mock.Mock(name="command"), asyncio.Future())
+        assert not hasattr(holder, "main_task")
+
+        task = mock.Mock(name="task")
+        holder.add_main_task(task)
+        assert holder.main_task is task
+
+    describe "add":
+
+        @pytest.fixture()
+        def holder(self):
+            return MessageHolder(mock.Mock(name="command"), asyncio.Future())
+
+        async it "can be given a command without execute", holder:
+            fut = asyncio.Future()
+            command = mock.Mock(name="command")
+            await holder.add(fut, command)
+            assert holder.ts == [(fut, False, True)]
+
+            item = await holder.queue.get()
+            assert isinstance(item, ProcessItem)
+
+            assert item.fut is fut
+            assert item.command is command
+            assert item.execute is None
+            assert item.messages is holder
+
+        async it "can be given a command without execute", holder:
+            fut = asyncio.Future()
+            execute = mock.Mock(name="execute")
+            command = mock.Mock(name="command")
+
+            await holder.add(fut, command, execute)
+            assert holder.ts == [(fut, False, True)]
+
+            item = await holder.queue.get()
+            assert isinstance(item, ProcessItem)
+
+            assert item.fut is fut
+            assert item.command is command
+            assert item.execute is execute
+            assert item.messages is holder
+
+    describe "async iteration":
+
+        @pytest.fixture()
+        def final_future(self):
+            return asyncio.Future()
+
+        @pytest.fixture()
+        def process_item_mock(self):
+            return mock.Mock(name="process_item_mock")
+
+        @pytest.fixture()
+        async def holder(self, final_future, process_item_mock):
+            holder = MessageHolder(mock.Mock(name="command"), final_future)
+
+            async def get():
+                async for message in holder:
+                    process_item_mock(message)
+
+            t = asyncio.get_event_loop().create_task(get())
+            try:
+                yield t, holder
+            finally:
+                t.cancel()
+                await asyncio.wait([t])
+
+        async it "gets items off the queue until final_future is done", final_future, holder, process_item_mock:
+            t, holder = holder
+
+            f1 = asyncio.Future()
+            f2 = asyncio.Future()
+            f3 = asyncio.Future()
+
+            c1 = mock.Mock(name="c1")
+            c2 = mock.Mock(name="c2")
+            c3 = mock.Mock(name="c3")
+
+            got = []
+
+            def process(message):
+                got.append(message)
+                if message.command is c2:
+                    final_future.cancel()
+
+            process_item_mock.side_effect = process
+
+            await holder.add(f1, c1)
+            await holder.add(f2, c2)
+            await holder.add(f3, c3)
+
+            await t
+
+            assert len(got) == 2
+            assert got[0].fut is f1
+            assert got[0].command is c1
+
+            assert got[1].fut is f2
+            assert got[1].command is c2
+
+            # The three we added
+            assert len(holder.ts) == 3
+
+        async it "cancels the getter if final_future is cancelled", final_future, holder:
+            t, holder = holder
+
+            final_future.cancel()
+
+            await t
+
+            assert len(holder.ts) == 1
+            assert holder.ts[0][0].cancelled()
+
+    describe "finish":
+        async it "transfers exception from main_task to tasks with do_transfer to true":
+            t1 = asyncio.Future()
+            t2 = asyncio.Future()
+
+            t3 = asyncio.Future()
+            t3.set_result("DONE")
+
+            class E(Exception):
+                pass
+
+            error = E("WAT")
+            main_task = asyncio.Future()
+            main_task.set_exception(error)
+
+            holder = MessageHolder(mock.Mock(name="command"), asyncio.Future())
+            holder.add_main_task(main_task)
+
+            holder.ts = [(t1, True, True), (t2, True, False), (t3, True, True)]
+            await holder.finish()
+
+            with assertRaises(E, "WAT"):
+                await t1
+            with assertRaises(asyncio.CancelledError):
+                await t2
+            assert (await t3) is "DONE"
+
+        async it "cancels tasks if cancelled is true":
+            t1 = asyncio.Future()
+            t2 = asyncio.Future()
+
+            t3 = asyncio.Future()
+            t3.set_result("DONE")
+
+            main_task = asyncio.Future()
+
+            holder = MessageHolder(mock.Mock(name="command"), asyncio.Future())
+            holder.add_main_task(main_task)
+
+            holder.ts = [(t1, True, True), (t2, True, False), (t3, True, True)]
+            await holder.finish(cancelled=True)
+
+            with assertRaises(asyncio.CancelledError):
+                await t1
+            with assertRaises(asyncio.CancelledError):
+                await t2
+            assert (await t3) is "DONE"
+
+        async it "does not cancel not do_cancel tasks if cancelled is false and main_task not errored":
+            t1 = asyncio.Future()
+            t2 = asyncio.Future()
+
+            t3 = asyncio.Future()
+            t3.set_result("DONE")
+
+            main_task = asyncio.Future()
+
+            holder = MessageHolder(mock.Mock(name="command"), asyncio.Future())
+            holder.add_main_task(main_task)
+
+            holder.ts = [(t1, False, True), (t2, False, False), (t3, True, True)]
+
+            called = []
+
+            async def finisher():
+                called.append("START")
+                await holder.finish(cancelled=False)
+                called.append("DONE")
+
+            t = asyncio.get_event_loop().create_task(finisher())
+            try:
+                await asyncio.sleep(0.1)
+
+                called.append("STOP t1")
+                t1.set_result(None)
+
+                called.append("STOP t2")
+                t2.set_result(None)
+
+                await t
+
+                assert called == ["START", "STOP t1", "STOP t2", "DONE"]
+            finally:
+                t.cancel()
+                await asyncio.wait([t])
+
+        async it "does cancel do_cancel tasks if cancelled is false and main_task not errored":
+            t1 = asyncio.Future()
+            t2 = asyncio.Future()
+
+            t3 = asyncio.Future()
+            t3.set_result("DONE")
+
+            main_task = asyncio.Future()
+
+            holder = MessageHolder(mock.Mock(name="command"), asyncio.Future())
+            holder.add_main_task(main_task)
+
+            holder.ts = [(t1, False, True), (t2, True, False), (t3, True, True)]
+
+            called = []
+
+            async def finisher():
+                called.append("START")
+                await holder.finish(cancelled=False)
+                called.append("DONE")
+
+            t = asyncio.get_event_loop().create_task(finisher())
+            try:
+                await asyncio.sleep(0.1)
+
+                assert t2.cancelled()
+
+                called.append("STOP t1")
+                t1.set_result(None)
+
+                await t
+
+                assert called == ["START", "STOP t1", "DONE"]
+            finally:
+                t.cancel()
+                await asyncio.wait([t])
+
+        async it "does cancel not do_cancel tasks if main task is cancelled":
+            t1 = asyncio.Future()
+            t2 = asyncio.Future()
+
+            t3 = asyncio.Future()
+            t3.set_result("DONE")
+
+            main_task = asyncio.Future()
+            main_task.cancel()
+
+            holder = MessageHolder(mock.Mock(name="command"), asyncio.Future())
+            holder.add_main_task(main_task)
+
+            holder.ts = [(t1, False, True), (t2, True, False), (t3, True, True)]
+
+            await holder.finish(cancelled=False)
+
+            assert t1.cancelled()
+            assert t2.cancelled()
+
+        async it "works if no main_task":
+            t1 = asyncio.Future()
+            t2 = asyncio.Future()
+
+            t3 = asyncio.Future()
+            t3.set_result("DONE")
+
+            holder = MessageHolder(mock.Mock(name="command"), asyncio.Future())
+
+            holder.ts = [(t1, False, True), (t2, True, False), (t3, True, True)]
+
+            await holder.finish(cancelled=True)
+
+            assert t1.cancelled()
+            assert t2.cancelled()
