@@ -276,19 +276,22 @@ class WSStream:
                     raise exc
                 raise
 
-    async def start(self, path, body):
-        self.message_id = str(uuid.uuid1())
+    async def start(self, path, body, message_id=None):
+        if message_id is None:
+            self.message_id = message_id = str(uuid.uuid1())
         await self.server.ws_write(
-            self.connection, {"path": path, "body": body, "message_id": self.message_id}
+            self.connection, {"path": path, "body": body, "message_id": message_id}
         )
 
-    async def check_reply(self, reply):
+    async def check_reply(self, reply, message_id=None):
         d, nd = await asyncio.wait([self.server.ws_read(self.connection)], timeout=5)
         if nd:
             assert False, "Timedout waiting for future"
 
         got = await list(d)[0]
-        wanted = {"message_id": self.message_id, "reply": reply}
+        if message_id is None:
+            message_id = self.message_id
+        wanted = {"message_id": message_id, "reply": reply}
         if got != wanted:
             print("got --->")
             print(got)
