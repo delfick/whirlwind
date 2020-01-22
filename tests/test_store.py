@@ -1,6 +1,13 @@
 # coding: spec
 
-from whirlwind.store import Store, NoSuchPath, NoSuchParent, NonInteractiveParent, command_spec
+from whirlwind.store import (
+    Store,
+    NoSuchPath,
+    NoSuchParent,
+    NonInteractiveParent,
+    command_spec,
+    create_task,
+)
 
 from delfick_project.option_merge import MergedOptionStringFormatter
 from delfick_project.norms import dictobj, sb, Meta, BadSpecValue
@@ -527,7 +534,7 @@ describe "command_spec":
         grandchild2_message_id = str(uuid.uuid1())
 
         def add_runner(name, coro):
-            task = asyncio.get_event_loop().create_task(coro, name=name)
+            task = create_task(coro, name=name)
             runners.append(task)
             return task
 

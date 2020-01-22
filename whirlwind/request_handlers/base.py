@@ -1,3 +1,5 @@
+from whirlwind.store import create_task
+
 from delfick_project.norms import sb, dictobj, Meta
 from tornado.web import RequestHandler, HTTPError
 from tornado import websocket
@@ -393,7 +395,7 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
                     if exc:
                         log.exception(exc, exc_info=(type(exc), exc, exc.__traceback__))
 
-            t = asyncio.get_event_loop().create_task(doit(), name=f"<process_command: {body}>")
+            t = create_task(doit(), name=f"<process_command: {body}>")
             t.add_done_callback(done)
             self.wsconnections[message_key] = t
 
