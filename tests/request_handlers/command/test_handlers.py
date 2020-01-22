@@ -61,7 +61,7 @@ def make_wrapper(server_wrapper):
 
 describe "WSHandler and CommandHandler":
 
-    def make_commander(self, handlerKls):
+    def make_commander(self, handlerKls, *, do_allow_ws_only):
         commander = mock.Mock(name="commander")
 
         class Executor:
@@ -70,7 +70,8 @@ describe "WSHandler and CommandHandler":
                 s.progress_cb = progress_cb
                 s.request_handler = request_handler
 
-            async def execute(s, path, body, extra_options=None):
+            async def execute(s, path, body, extra_options=None, allow_ws_only=False):
+                assert allow_ws_only == do_allow_ws_only
                 assert isinstance(s.request_handler, handlerKls)
                 s.progress_cb("information", one=1, thing=Thing())
                 s.progress_cb(ValueError("NOPE"))
@@ -80,7 +81,7 @@ describe "WSHandler and CommandHandler":
         return commander
 
     async it "WSHandler calls out to commander.execute", make_wrapper, asserter:
-        commander = self.make_commander(WSHandler)
+        commander = self.make_commander(WSHandler, do_allow_ws_only=True)
 
         message_id = None
 
@@ -110,7 +111,7 @@ describe "WSHandler and CommandHandler":
                 )
 
     async it "CommandHandler calls out to commander.execute", make_wrapper, asserter:
-        commander = self.make_commander(CommandHandler)
+        commander = self.make_commander(CommandHandler, do_allow_ws_only=False)
 
         async with make_wrapper(commander) as server:
             await server.runner.assertPUT(
@@ -121,7 +122,7 @@ describe "WSHandler and CommandHandler":
             )
 
     async it "raises 404 if the path is invalid", make_wrapper, asserter:
-        commander = self.make_commander(CommandHandler)
+        commander = self.make_commander(CommandHandler, do_allow_ws_only=False)
         executor = mock.Mock(name="executor")
         executor.execute = asynctest.mock.CoroutineMock(name="execute")
         executor.execute.side_effect = NoSuchPath(wanted="/v1/other", available=["/v1/somewhere"])

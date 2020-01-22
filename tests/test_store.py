@@ -371,6 +371,65 @@ describe "command_spec":
 
         assert len(store.command_spec.existing_commands) == 0
 
+    async it "doesn't allow ws_only commands if told not to":
+        store = Store(default_path="/v1", formatter=MergedOptionStringFormatter)
+
+        @store.command("interactive")
+        class Interactive(store.Command):
+            async def execute(self, messages):
+                pass
+
+        @store.command("command1", parent=Interactive)
+        class Command1(store.Command):
+            async def execute(self):
+                pass
+
+        @store.command("command2")
+        class Command2(store.Command):
+            async def execute(self):
+                pass
+
+        @store.command("command3")
+        class Command3(store.Command):
+            async def execute(self):
+                pass
+
+        final_future = asyncio.Future()
+        message_id = str(uuid.uuid1())
+        meta = Meta({"message_id": message_id, "final_future": final_future,}, [])
+
+        with assertRaises(
+            BadSpecValue,
+            "Unknown command",
+            available=["command2", "command3"],
+            wanted="nonexistant",
+            meta=meta.at("body").at("command"),
+        ):
+            store.command_spec.normalise(
+                meta, {"path": "/v1", "body": {"command": "nonexistant"}},
+            )
+
+        with assertRaises(
+            BadSpecValue,
+            "Unknown command",
+            available=["command2", "command3", "interactive", "interactive:command1"],
+            wanted="nonexistant",
+            meta=meta.at("body").at("command"),
+        ):
+            store.command_spec.normalise(
+                meta, {"path": "/v1", "body": {"command": "nonexistant"}, "allow_ws_only": True},
+            )
+
+        with assertRaises(
+            BadSpecValue,
+            "Command is for websockets only",
+            available=["command2", "command3"],
+            meta=meta.at("body").at("command"),
+        ):
+            store.command_spec.normalise(
+                meta, {"path": "/v1", "body": {"command": "interactive"}},
+            )
+
     async it "allows children commands":
         store = Store(default_path="/v1", formatter=MergedOptionStringFormatter)
 
@@ -476,7 +535,11 @@ describe "command_spec":
             "start_thing",
             store.command_spec.normalise(
                 make_meta(parent_message_id),
-                {"path": "/v1", "body": {"command": "thing", "args": {"one": 2}}},
+                {
+                    "path": "/v1",
+                    "body": {"command": "thing", "args": {"one": 2}},
+                    "allow_ws_only": True,
+                },
             )(),
         )
 
@@ -498,7 +561,11 @@ describe "command_spec":
 
             thing = await store.command_spec.normalise(
                 make_meta((parent_message_id, child1_message_id)),
-                {"path": "/v1", "body": {"command": "other", "args": {"instruction": "nothing"}},},
+                {
+                    "path": "/v1",
+                    "body": {"command": "other", "args": {"instruction": "nothing"}},
+                    "allow_ws_only": True,
+                },
             )()
             parent1 = thing[1]
             assert thing == (
@@ -512,7 +579,7 @@ describe "command_spec":
                 "start_another",
                 store.command_spec.normalise(
                     make_meta((parent_message_id, child3_message_id)),
-                    {"path": "/v1", "body": {"command": "another"}},
+                    {"path": "/v1", "body": {"command": "another"}, "allow_ws_only": True},
                 )(),
             )
 
@@ -520,12 +587,20 @@ describe "command_spec":
 
             t1 = await store.command_spec.normalise(
                 make_meta((parent_message_id, child3_message_id, grandchild1_message_id)),
-                {"path": "/v1", "body": {"command": "amaze", "args": {"number": 23}}},
+                {
+                    "path": "/v1",
+                    "body": {"command": "amaze", "args": {"number": 23}},
+                    "allow_ws_only": True,
+                },
             )()
 
             t2 = await store.command_spec.normalise(
                 make_meta((parent_message_id, child3_message_id, grandchild2_message_id)),
-                {"path": "/v1", "body": {"command": "amaze", "args": {"number": 42}}},
+                {
+                    "path": "/v1",
+                    "body": {"command": "amaze", "args": {"number": 42}},
+                    "allow_ws_only": True,
+                },
             )()
 
             thing = await another_task
@@ -536,7 +611,11 @@ describe "command_spec":
 
             thing2 = await store.command_spec.normalise(
                 make_meta((parent_message_id, child2_message_id)),
-                {"path": "/v1", "body": {"command": "other", "args": {"instruction": "stop"}}},
+                {
+                    "path": "/v1",
+                    "body": {"command": "other", "args": {"instruction": "stop"}},
+                    "allow_ws_only": True,
+                },
             )()
             parent2 = thing2[1]
             assert thing2 == (
