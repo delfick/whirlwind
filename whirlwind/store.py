@@ -12,6 +12,17 @@ import sys
 log = logging.getLogger("whirlwind.store")
 
 
+def create_task(coro, name=None):
+    loop = asyncio.get_event_loop()
+    version_info = sys.version_info
+    if version_info >= (3, 8):
+        return loop.create_task(coro, name=name)
+    elif version_info >= (3, 7):
+        return loop.create_task(coro)
+    else:
+        return asyncio.ensure_future(coro)
+
+
 def retrieve_exception(result):
     if result.cancelled():
         return
@@ -46,9 +57,7 @@ async def pass_on_result(fut, command, execute, *, log_exceptions):
         else:
             fut.set_result(result.result())
 
-    task = asyncio.get_event_loop().create_task(
-        coro, name=f"<pass_on_result: {command.__class__.__name__}>"
-    )
+    task = create_task(coro, name=f"<pass_on_result: {command.__class__.__name__}>")
     task.add_done_callback(transfer)
     return await fut
 
@@ -98,9 +107,7 @@ class ProcessItem:
             self.fut.set_exception(sys.exc_info()[1])
             return self.fut
         else:
-            task = asyncio.get_event_loop().create_task(
-                coro, name=f"<process: {self.command.__class__.__name__}>"
-            )
+            task = create_task(coro, name=f"<process: {self.command.__class__.__name__}>")
             task.add_done_callback(retrieve_exception)
             self.messages.ts.append((task, False, True))
 
@@ -144,7 +151,7 @@ class MessageHolder:
 
     async def __anext__(self):
         while True:
-            getter = asyncio.get_event_loop().create_task(
+            getter = create_task(
                 self.queue.get(), name=f"<queue.get: {self.command.__class__.__name__}>"
             )
             self.ts.append((getter, True, False))
@@ -286,7 +293,7 @@ class command_spec(sb.Spec):
 
         async def execute():
             try:
-                task = asyncio.get_event_loop().create_task(
+                task = create_task(
                     existing["command"].execute(existing["messages"]),
                     name=f"<execute interactive: {command.__class__.__name__}",
                 )
