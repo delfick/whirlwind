@@ -3,13 +3,53 @@ from whirlwind.commander import Command
 from delfick_project.norms import dictobj, sb, BadSpecValue
 from delfick_project.option_merge import NoFormat
 from collections import defaultdict
+import logging
+import asyncio
 import inspect
+
+
+log = logging.getLogger("whirlwind.store")
+
+
+def retrieve_exception(result):
+    if result.cancelled():
+        return
+    result.exception()
 
 
 def is_interactive(obj):
     return (
         obj and hasattr(obj, "execute") and "messages" in inspect.signature(obj.execute).parameters
     )
+
+
+async def pass_on_result(fut, command, execute, *, log_exceptions):
+    if execute:
+        coro = execute()
+    else:
+        coro = command.execute()
+
+    def transfer(result):
+        if result.cancelled():
+            fut.cancel()
+            return
+
+        exc = result.exception()
+        if fut.done():
+            return
+
+        if exc:
+            if log_exceptions:
+                log.error(exc)
+            fut.set_exception(exc)
+        else:
+            fut.set_result(result.result())
+
+    task = asyncio.get_event_loop().create_task(
+        coro, name=f"<pass_on_result: {command.__class__.__name__}>"
+    )
+    task.add_done_callback(transfer)
+    return await fut
 
 
 class NoSuchPath(Exception):
