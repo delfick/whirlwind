@@ -1,12 +1,12 @@
 .. toctree::
     :hidden:
 
-    docs/server
-    docs/handlers
-    docs/test_helpers
-    docs/commander
-    docs/interactive_commands
+    api/server
+    api/handlers
+    api/test_helpers
+    api/commander
+    api/interactive_commands
 
 .. _whirlwind:
 
-.. include:: ../../README.rst
+.. include:: ../README.rst
