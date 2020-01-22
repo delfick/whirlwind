@@ -6,6 +6,7 @@ from collections import defaultdict
 import logging
 import asyncio
 import inspect
+import sys
 
 
 log = logging.getLogger("whirlwind.store")
@@ -78,6 +79,32 @@ class NonInteractiveParent(Exception):
             s = self.wanted.__name__
 
         super().__init__(self, f"Store commands can only specify an interactive parent: {s}")
+
+
+class ProcessItem:
+    def __init__(self, fut, command, execute, messages):
+        self.fut = fut
+        self.execute = execute
+        self.command = command
+        self.messages = messages
+        self.interactive = is_interactive(self.command)
+
+    def process(self):
+        try:
+            coro = pass_on_result(
+                self.fut, self.command, self.execute, log_exceptions=self.interactive
+            )
+        except:
+            self.fut.set_exception(sys.exc_info()[1])
+            return self.fut
+        else:
+            task = asyncio.get_event_loop().create_task(
+                coro, name=f"<process: {self.command.__class__.__name__}>"
+            )
+            task.add_done_callback(retrieve_exception)
+            self.messages.ts.append((task, False, True))
+
+            return task
 
 
 class command_spec(sb.Spec):
