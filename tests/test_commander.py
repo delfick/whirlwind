@@ -4,7 +4,7 @@ from whirlwind.commander import Commander
 from whirlwind import test_helpers as thp
 from whirlwind.store import Store
 
-from delfick_project.option_merge import MergedOptionStringFormatter, BadOptionFormat
+from delfick_project.option_merge import MergedOptionStringFormatter, BadOptionFormat, MergedOptions
 from delfick_project.norms import dictobj, sb, BadSpecValue
 from delfick_project.errors_pytest import assertRaises
 from unittest import mock
@@ -218,3 +218,7 @@ describe "Commander":
 
         assert val == value
         assert thing.other is other
+
+    async it "allows commands to be retrieved from a MergedOptions":
+        options = MergedOptions.using({"command": FieldsRequired}, dont_prefix=[dictobj])
+        assert options["command"] is FieldsRequired

@@ -4,6 +4,8 @@ import asyncio
 
 
 class Command(dictobj.Spec):
+    _merged_options_formattable = True
+
     async def execute(self):
         raise NotImplementedError("Base command has no execute implementation")
 
