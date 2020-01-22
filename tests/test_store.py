@@ -6,7 +6,10 @@ from delfick_project.option_merge import MergedOptionStringFormatter
 from delfick_project.norms import dictobj, sb, Meta, BadSpecValue
 from delfick_project.errors_pytest import assertRaises
 from unittest import mock
+import inspect
+import asyncio
 import uuid
+import sys
 
 describe "Store":
     it "takes in some things":
@@ -367,6 +370,192 @@ describe "command_spec":
         assert isinstance(stuff, Stuff)
 
         assert len(store.command_spec.existing_commands) == 0
+
+    async it "allows children commands":
+        store = Store(default_path="/v1", formatter=MergedOptionStringFormatter)
+
+        thing_started = asyncio.Future()
+        another_started = asyncio.Future()
+
+        runners = [asyncio.Future()]
+        final_future = asyncio.Future()
+
+        def progress_cb(msg, **kwargs):
+            if isinstance(msg, Exception):
+                runners[0].set_exception(msg)
+                return
+
+            if msg["instruction"] == "thing_started":
+                thing_started.set_result(True)
+            elif msg["instruction"] == "another_started":
+                another_started.set_result(True)
+
+        def make_meta(message_id, **kwargs):
+            return Meta(
+                {
+                    "message_id": message_id,
+                    "final_future": final_future,
+                    "progress_cb": progress_cb,
+                    **kwargs,
+                },
+                [],
+            )
+
+        @store.command("thing")
+        class Thing(store.Command):
+            one = dictobj.Field(sb.integer_spec)
+            progress_cb = store.injected("progress_cb")
+
+            async def execute(self, messages):
+                self.progress_cb({"instruction": "thing_started"})
+
+                async for message in messages:
+                    task = message.process()
+                    if task.done() and task.exception():
+                        self.progress_cb(task.exception())
+                        continue
+
+                    if not message.interactive:
+                        await task
+
+                    if isinstance(message.command, Other) and message.command.instruction == "stop":
+                        break
+
+        @store.command("other", parent=Thing)
+        class Other(store.Command):
+            parent = store.injected("_parent_command")
+
+            instruction = dictobj.Field(sb.string_spec, wrapper=sb.required)
+
+            async def execute(self):
+                return self, self.parent
+
+        @store.command("another", parent=Thing)
+        class AnotherInteractive(store.Command):
+            progress_cb = store.injected("progress_cb")
+
+            async def execute(self, messages):
+                self.progress_cb({"instruction": "another_started"})
+
+                ts = []
+                async for message in messages:
+                    t = message.process()
+                    if t.done() and t.exception():
+                        await t
+                    ts.append(t)
+                    if len(ts) == 2:
+                        break
+
+                got = []
+                for t in ts:
+                    got.append(await t)
+                return got
+
+        @store.command("amaze", parent=AnotherInteractive)
+        class Amaze(store.Command):
+            number = dictobj.Field(sb.integer_spec)
+
+            async def execute(self):
+                return self.number
+
+        parent_message_id = str(uuid.uuid1())
+
+        child1_message_id = str(uuid.uuid1())
+        child2_message_id = str(uuid.uuid1())
+        child3_message_id = str(uuid.uuid1())
+
+        grandchild1_message_id = str(uuid.uuid1())
+        grandchild2_message_id = str(uuid.uuid1())
+
+        def add_runner(name, coro):
+            task = asyncio.get_event_loop().create_task(coro, name=name)
+            runners.append(task)
+            return task
+
+        thing_task = add_runner(
+            "start_thing",
+            store.command_spec.normalise(
+                make_meta(parent_message_id),
+                {"path": "/v1", "body": {"command": "thing", "args": {"one": 2}}},
+            )(),
+        )
+
+        async def wait_for(name, fut):
+            await asyncio.wait([fut, *runners], return_when=asyncio.FIRST_COMPLETED)
+
+            for t in runners:
+                if t.done() and not t.cancelled():
+                    res = await t
+
+            for t in runners:
+                if t.done():
+                    await t
+
+            return await fut
+
+        try:
+            await wait_for("wait for started thing", thing_started)
+
+            thing = await store.command_spec.normalise(
+                make_meta((parent_message_id, child1_message_id)),
+                {"path": "/v1", "body": {"command": "other", "args": {"instruction": "nothing"}},},
+            )()
+            parent1 = thing[1]
+            assert thing == (
+                {"instruction": "nothing", "parent": parent1},
+                {"one": 2, "progress_cb": progress_cb},
+            )
+            assert isinstance(parent1, Thing)
+            assert isinstance(thing[0], Other)
+
+            another_task = add_runner(
+                "start_another",
+                store.command_spec.normalise(
+                    make_meta((parent_message_id, child3_message_id)),
+                    {"path": "/v1", "body": {"command": "another"}},
+                )(),
+            )
+
+            await wait_for("wait for another to start", another_started)
+
+            t1 = await store.command_spec.normalise(
+                make_meta((parent_message_id, child3_message_id, grandchild1_message_id)),
+                {"path": "/v1", "body": {"command": "amaze", "args": {"number": 23}}},
+            )()
+
+            t2 = await store.command_spec.normalise(
+                make_meta((parent_message_id, child3_message_id, grandchild2_message_id)),
+                {"path": "/v1", "body": {"command": "amaze", "args": {"number": 42}}},
+            )()
+
+            thing = await another_task
+            assert thing == [23, 42]
+
+            assert t1 == 23
+            assert t2 == 42
+
+            thing2 = await store.command_spec.normalise(
+                make_meta((parent_message_id, child2_message_id)),
+                {"path": "/v1", "body": {"command": "other", "args": {"instruction": "stop"}}},
+            )()
+            parent2 = thing2[1]
+            assert thing2 == (
+                {"instruction": "stop", "parent": parent2},
+                {"one": 2, "progress_cb": progress_cb},
+            )
+            assert isinstance(parent1, Thing)
+            assert parent1 is parent2
+            assert isinstance(thing2[0], Other)
+
+            assert (await thing_task) is None
+        finally:
+            final_future.cancel()
+
+            for t in runners:
+                t.cancel()
+
+            if runners:
+                await asyncio.wait(runners)
 
     it "complains if the path or command is unknown":
         store = Store(default_path="/v1")

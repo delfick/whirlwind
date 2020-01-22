@@ -1,7 +1,7 @@
 from whirlwind.commander import Command
 
-from delfick_project.norms import dictobj, sb, BadSpecValue
-from delfick_project.option_merge import NoFormat
+from delfick_project.norms import dictobj, sb, BadSpecValue, Meta
+from delfick_project.option_merge import NoFormat, MergedOptions
 from collections import defaultdict
 import logging
 import asyncio
@@ -173,7 +173,7 @@ class command_spec(sb.Spec):
         self.paths = paths
         self.existing_commands = {}
 
-    def normalise_filled(self, meta, val):
+    def make_command(self, meta, val, existing):
         v = sb.set_options(path=sb.required(sb.string_spec())).normalise(meta, val)
 
         path = v["path"]
@@ -190,6 +190,9 @@ class command_spec(sb.Spec):
         args = val["body"]["args"]
         name = val["body"]["command"]
 
+        if existing:
+            name = val["body"]["command"] = f"{existing['path']}:{name}"
+
         available_commands = self.paths[path]
 
         if name not in available_commands:
@@ -200,9 +203,96 @@ class command_spec(sb.Spec):
                 meta=meta.at("body").at("command"),
             )
 
-        meta = meta.at("body").at("args")
+        extra_context = {}
+        if existing:
+            extra_context["_parent_command"] = existing["command"]
+
+        everything = meta.everything
+        if isinstance(meta.everything, MergedOptions):
+            everything = meta.everything.wrapped()
+
+        everything.update(extra_context)
+
+        meta = Meta(everything, []).at("body").at("args")
         command = available_commands[name]["spec"].normalise(meta, args)
-        return command.execute
+        return command, name
+
+    def find_command(self, message_id):
+        if isinstance(message_id, tuple) and len(message_id) == 1:
+            message_id = message_id[0]
+
+        if not message_id or isinstance(message_id, str):
+            return None, (message_id,)
+
+        parent = message_id[:-1]
+        if parent not in self.existing_commands:
+            raise NoSuchParent(wanted=parent)
+
+        return self.existing_commands[parent], message_id
+
+    def normalise_filled(self, meta, val):
+        parent_existing, message_id_tuple = self.find_command(meta.everything.get("message_id"))
+        command, path = self.make_command(meta, val, parent_existing)
+
+        existing = None
+        if command and is_interactive(command):
+            existing = {"command": command, "messages": None, "path": path}
+            self.existing_commands[message_id_tuple] = existing
+
+        async def execute():
+            if parent_existing and not existing:
+                fut = asyncio.Future()
+                await parent_existing["messages"].add(fut, command, ())
+                return await fut
+
+            try:
+                if not existing:
+                    return await command.execute()
+                else:
+                    final_future = meta.everything.get("final_future")
+                    return await self.execute_interactive(
+                        final_future, parent_existing, existing, command
+                    )
+            finally:
+                if message_id_tuple in self.existing_commands:
+                    del self.existing_commands[message_id_tuple]
+
+        return execute
+
+    async def execute_interactive(self, final_future, parent_existing, existing, command):
+        holder_kls = MessageHolder
+        if hasattr(command, "MessageHolder"):
+            holder_kls = command.MessageHolder
+        existing["messages"] = holder_kls(command, final_future)
+
+        async def execute():
+            try:
+                task = asyncio.get_event_loop().create_task(
+                    existing["command"].execute(existing["messages"]),
+                    name=f"<execute interactive: {command.__class__.__name__}",
+                )
+                existing["messages"].add_main_task(task)
+                return await task
+            finally:
+                cancelled = False
+                exc_info = sys.exc_info()
+                if exc_info and isinstance(exc_info[1], asyncio.CancelledError):
+                    cancelled = True
+
+                if isinstance(existing, dict) and existing["messages"]:
+                    try:
+                        await existing["messages"].finish(cancelled=cancelled)
+                    except asyncio.CancelledError:
+                        raise
+                    except:
+                        log.exception("Failed to finish the message holder")
+
+        if parent_existing:
+            fut = asyncio.Future()
+            await parent_existing["messages"].add(fut, command, execute)
+            return await fut
+        else:
+            return await execute()
 
 
 class Store:
