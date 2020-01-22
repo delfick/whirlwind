@@ -40,6 +40,50 @@ class NonInteractiveParent(Exception):
         super().__init__(self, f"Store commands can only specify an interactive parent: {s}")
 
 
+class command_spec(sb.Spec):
+    """
+    Knows how to turn ``{"path": <string>, "body": {"command": <string>, "args": <dict>}}``
+    into the execute method of a Command object.
+
+    It uses the FieldSpec in self.paths to normalise the args into the Command instance.
+    """
+
+    def setup(self, paths):
+        self.paths = paths
+        self.existing_commands = {}
+
+    def normalise_filled(self, meta, val):
+        v = sb.set_options(path=sb.required(sb.string_spec())).normalise(meta, val)
+
+        path = v["path"]
+
+        if path not in self.paths:
+            raise NoSuchPath(path, sorted(self.paths))
+
+        val = sb.set_options(
+            body=sb.required(
+                sb.set_options(args=sb.dictionary_spec(), command=sb.required(sb.string_spec()))
+            )
+        ).normalise(meta, val)
+
+        args = val["body"]["args"]
+        name = val["body"]["command"]
+
+        available_commands = self.paths[path]
+
+        if name not in available_commands:
+            raise BadSpecValue(
+                "Unknown command",
+                wanted=name,
+                available=sorted(available_commands),
+                meta=meta.at("body").at("command"),
+            )
+
+        meta = meta.at("body").at("args")
+        command = available_commands[name]["spec"].normalise(meta, args)
+        return command.execute
+
+
 class Store:
     Command = Command
 
@@ -50,6 +94,7 @@ class Store:
         self.formatter = formatter
         self.default_path = default_path
         self.paths = defaultdict(dict)
+        self.command_spec = command_spec(self.paths)
 
     def clone(self):
         new_store = Store(self.prefix, self.default_path, self.formatter)
@@ -129,47 +174,3 @@ class Store:
             return kls
 
         return decorator
-
-    @property
-    def command_spec(self):
-        class command_spec(sb.Spec):
-            """
-            Knows how to turn ``{"path": <string>, "body": {"command": <string>, "args": <dict>}}``
-            into a Command object.
-
-            It uses the FieldSpec in self.paths to normalise the args into
-            the Command instance.
-            """
-
-            def normalise_filled(s, meta, val):
-                v = sb.set_options(path=sb.required(sb.string_spec())).normalise(meta, val)
-
-                path = v["path"]
-
-                if path not in self.paths:
-                    raise NoSuchPath(path, sorted(self.paths))
-
-                val = sb.set_options(
-                    body=sb.required(
-                        sb.set_options(
-                            args=sb.dictionary_spec(), command=sb.required(sb.string_spec())
-                        )
-                    )
-                ).normalise(meta, val)
-
-                args = val["body"]["args"]
-                name = val["body"]["command"]
-
-                available_commands = self.paths[path]
-
-                if name not in available_commands:
-                    raise BadSpecValue(
-                        "Unknown command",
-                        wanted=name,
-                        available=sorted(available_commands),
-                        meta=meta.at("body").at("command"),
-                    )
-
-                return available_commands[name]["spec"].normalise(meta.at("body").at("args"), args)
-
-        return command_spec()

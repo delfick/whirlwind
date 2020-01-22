@@ -1,6 +1,6 @@
 # coding: spec
 
-from whirlwind.store import Store, NoSuchPath, NoSuchParent, NonInteractiveParent
+from whirlwind.store import Store, NoSuchPath, NoSuchParent, NonInteractiveParent, command_spec
 
 from delfick_project.option_merge import MergedOptionStringFormatter
 from delfick_project.norms import dictobj, sb, Meta, BadSpecValue
@@ -19,6 +19,8 @@ describe "Store":
         assert store.prefix is prefix
         assert store.default_path is default_path
         assert store.formatter is formatter
+        assert isinstance(store.command_spec, command_spec)
+        assert store.command_spec.paths is store.paths
 
         assert dict(store.paths) == {}
 
@@ -311,88 +313,98 @@ describe "Store":
                 class Command(store.Command):
                     pass
 
-    describe "command_spec":
-        it "normalises args into the spec for the correct object":
-            store = Store(default_path="/v1", formatter=MergedOptionStringFormatter)
 
-            wat = mock.Mock(name="wat")
-            meta = Meta({"wat": wat}, [])
+describe "command_spec":
+    async it "normalises args into a function that makes the command and provides a function for execution":
+        store = Store(default_path="/v1", formatter=MergedOptionStringFormatter)
 
-            @store.command("thing")
-            class Thing(store.Command):
-                one = dictobj.Field(sb.integer_spec)
+        wat = mock.Mock(name="wat")
+        meta = Meta({"wat": wat}, [])
 
-            @store.command("other")
-            class Other(store.Command):
-                two = dictobj.Field(sb.string_spec, wrapper=sb.required)
+        @store.command("thing")
+        class Thing(store.Command):
+            one = dictobj.Field(sb.integer_spec)
 
-            @store.command("stuff", path="/v2")
-            class Stuff(store.Command):
-                three = dictobj.Field(sb.overridden("{wat}"), formatted=True)
+            async def execute(self):
+                return self
 
-            thing = store.command_spec.normalise(
-                meta, {"path": "/v1", "body": {"command": "thing", "args": {"one": 20}}}
-            )
-            assert thing == {"one": 20}
-            assert isinstance(thing, Thing)
+        @store.command("other")
+        class Other(store.Command):
+            two = dictobj.Field(sb.string_spec, wrapper=sb.required)
 
-            try:
-                store.command_spec.normalise(meta, {"path": "/v1", "body": {"command": "other"}})
-                assert False, "expected an error"
-            except BadSpecValue as error:
-                assert len(error.errors) == 1
-                assert error.errors[0].as_dict() == {
-                    "message": "Bad value. Expected a value but got none",
-                    "meta": meta.at("body").at("args").at("two").delfick_error_format("two"),
-                }
+            async def execute(self):
+                return self
 
-            stuff = store.command_spec.normalise(
-                meta, {"path": "/v2", "body": {"command": "stuff"}}
-            )
-            assert stuff == {"three": wat}
-            assert isinstance(stuff, Stuff)
+        @store.command("stuff", path="/v2")
+        class Stuff(store.Command):
+            three = dictobj.Field(sb.overridden("{wat}"), formatted=True)
 
-        it "complains if the path or command is unknown":
-            store = Store(default_path="/v1")
-            meta = Meta({}, [])
+            async def execute(self):
+                return self
 
-            try:
-                store.command_spec.normalise(
-                    meta, {"path": "/somewhere", "body": {"command": "thing"}}
-                )
-                assert False, "Expected an error"
-            except NoSuchPath as error:
-                assert error.wanted == "/somewhere"
-                assert error.available == []
+        thing = await store.command_spec.normalise(
+            meta, {"path": "/v1", "body": {"command": "thing", "args": {"one": 20}}}
+        )()
+        assert thing == {"one": 20}
+        assert isinstance(thing, Thing)
 
-            @store.command("thing")
-            class Thing(store.Command):
-                pass
+        try:
+            await store.command_spec.normalise(
+                meta, {"path": "/v1", "body": {"command": "other"}}
+            )()
+            assert False, "expected an error"
+        except BadSpecValue as error:
+            assert len(error.errors) == 1
+            assert error.errors[0].as_dict() == {
+                "message": "Bad value. Expected a value but got none",
+                "meta": meta.at("body").at("args").at("two").delfick_error_format("two"),
+            }
 
-            @store.command("other")
-            class Other(store.Command):
-                pass
+        stuff = await store.command_spec.normalise(
+            meta, {"path": "/v2", "body": {"command": "stuff"}}
+        )()
+        assert stuff == {"three": wat}
+        assert isinstance(stuff, Stuff)
 
-            @store.command("stuff", path="/v2")
-            class Stuff(store.Command):
-                pass
+        assert len(store.command_spec.existing_commands) == 0
 
-            try:
-                store.command_spec.normalise(
-                    meta, {"path": "/somewhere", "body": {"command": "thing"}}
-                )
-                assert False, "Expected an error"
-            except NoSuchPath as error:
-                assert error.wanted == "/somewhere"
-                assert error.available == ["/v1", "/v2"]
+    it "complains if the path or command is unknown":
+        store = Store(default_path="/v1")
+        meta = Meta({}, [])
 
-            try:
-                store.command_spec.normalise(meta, {"path": "/v1", "body": {"command": "missing"}})
-                assert False, "Expected an error"
-            except BadSpecValue as error:
-                assert error.as_dict() == {
-                    "message": "Bad value. Unknown command",
-                    "wanted": "missing",
-                    "available": ["other", "thing"],
-                    "meta": meta.at("body").at("command").delfick_error_format("command"),
-                }
+        try:
+            store.command_spec.normalise(meta, {"path": "/somewhere", "body": {"command": "thing"}})
+            assert False, "Expected an error"
+        except NoSuchPath as error:
+            assert error.wanted == "/somewhere"
+            assert error.available == []
+
+        @store.command("thing")
+        class Thing(store.Command):
+            pass
+
+        @store.command("other")
+        class Other(store.Command):
+            pass
+
+        @store.command("stuff", path="/v2")
+        class Stuff(store.Command):
+            pass
+
+        try:
+            store.command_spec.normalise(meta, {"path": "/somewhere", "body": {"command": "thing"}})
+            assert False, "Expected an error"
+        except NoSuchPath as error:
+            assert error.wanted == "/somewhere"
+            assert error.available == ["/v1", "/v2"]
+
+        try:
+            store.command_spec.normalise(meta, {"path": "/v1", "body": {"command": "missing"}})
+            assert False, "Expected an error"
+        except BadSpecValue as error:
+            assert error.as_dict() == {
+                "message": "Bad value. Unknown command",
+                "wanted": "missing",
+                "available": ["other", "thing"],
+                "meta": meta.at("body").at("command").delfick_error_format("command"),
+            }

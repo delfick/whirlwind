@@ -249,10 +249,13 @@ describe "SimpleWebSocketBase":
 
             assert len(server.wsconnections) == 0
             assert info["message_key"] is not None
-            assert called == ["process", (msg, {"done": True}, info["message_key"], None)]
+            assert called == ["process", (msg, None, info["message_key"], None)]
 
             connection.close()
-            assert await server.runner.ws_read(connection) is None
+            assert await server.runner.ws_read(connection) == {
+                "message_id": message_id,
+                "reply": {"done": True},
+            }
 
     async it "calls the message_done with exc_info if an exception is raised in process_message", make_wrapper:
         info = {"message_key": None}
