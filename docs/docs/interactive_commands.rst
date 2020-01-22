@@ -63,6 +63,9 @@ can take in multiple requests to the same command. For example:
             self.progress_cb("started")
 
             async for message in messages:
+                # Important to mark the message as received
+                message.no_process()
+
                 self.progress_cb(f"got {message.command.__name__}")
 
     @store.command("command4", parent=Command3)
@@ -76,8 +79,9 @@ the completion of that command.
 
 You can determine if the message is also interactive by accessing the
 ``interactive`` property on the ``message``. And you can access the command
-itself by looking at ``message.command``. You don't need to call
-``message.process`` if you just want to use the options on the commands.
+itself by looking at ``message.command``. If you don't want to run the execute
+method on the command, then run ``message.no_process()`` so that finishing the
+parent command doesn't hang waiting for the message to be resolved.
 
 .. note:: interactive commands and their children are not exposed to the http
     endpoints that can be made from the commander.

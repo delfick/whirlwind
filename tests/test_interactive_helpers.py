@@ -163,6 +163,13 @@ describe "ProcessItem":
         assert item.messages is messages
         assert item.interactive
 
+    describe "no process":
+        async it "just sets the fut to received True":
+            fut = asyncio.Future()
+            item = ProcessItem(fut, None, None, None)
+            item.no_process()
+            assert (await fut) == {"received": True}
+
     describe "process":
 
         @pytest.fixture()

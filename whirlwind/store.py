@@ -113,6 +113,10 @@ class ProcessItem:
 
             return task
 
+    def no_process(self):
+        self.fut.set_result({"received": True})
+        return self.fut
+
 
 class MessageHolder:
     def __init__(self, command, final_future):
