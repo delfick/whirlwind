@@ -13,6 +13,7 @@ Changlog
       command. You then define what messages it accepts by using the
       ``store.command`` decorator with the ``parent`` option as the interactive
       command.
+    * Reusing a command with a different path is now an error
 
 0.6 - 18 September 2019
     * Migrated to `delfick_project <https://delfick-project.readthedocs.io/en/latest/index.html>`_

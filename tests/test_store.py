@@ -7,6 +7,7 @@ from whirlwind.store import (
     NonInteractiveParent,
     command_spec,
     create_task,
+    CantReuseCommands,
 )
 
 from delfick_project.option_merge import MergedOptionStringFormatter
@@ -176,6 +177,26 @@ describe "Store":
             meta = Meta({"wat": wat}, []).at("options")
             thing = store.paths["/v1"]["thing"]["spec"].normalise(meta, {"one": 2, "two": "yeap"})
             assert thing == {"one": 2, "two": "yeap", "three": wat}
+
+        it "complains if you try to reuse a command":
+            store = Store()
+
+            @store.command("thing")
+            class Thing(store.Command):
+                pass
+
+            # Can use a child kls
+            @store.command("another_path")
+            class Other(Thing):
+                pass
+
+            # Can't use the same class though
+            with assertRaises(CantReuseCommands):
+                try:
+                    store.command("another_path")(Thing)
+                except CantReuseCommands as error:
+                    assert error.reusing is Thing
+                    raise
 
         it "works":
             store = Store()

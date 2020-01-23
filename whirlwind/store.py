@@ -3,6 +3,7 @@ from whirlwind.commander import Command
 from delfick_project.norms import dictobj, sb, BadSpecValue, Meta
 from delfick_project.option_merge import NoFormat, MergedOptions
 from collections import defaultdict
+from textwrap import dedent
 import logging
 import asyncio
 import inspect
@@ -10,6 +11,41 @@ import sys
 
 
 log = logging.getLogger("whirlwind.store")
+
+
+class CantReuseCommands(Exception):
+    def __init__(self, reusing):
+        self.reusing = reusing
+        super().__init__(
+            dedent(
+                f"""
+            You tried to reuse {self.reusing} as a store command.
+
+            You can use a subclass instead. For example:
+
+                @store.command("command")
+                class Example(store.Command):
+                    ...
+
+                @store.command("command2")
+                class Example2(Example):
+                    ...
+
+            Or you can do something like:
+
+                class Base(store.Command):
+                    ...
+
+                @store.command("command1")
+                class Command1(Base):
+                    ...
+
+                @store.command("command2")
+                class Command2(Base):
+                    ...
+        """
+            )
+        )
 
 
 def create_task(coro, name=None):
@@ -390,6 +426,9 @@ class Store:
         path = self.normalise_path(path)
 
         def decorator(kls):
+            if "__whirlwind_command__" in kls.__dict__:
+                raise CantReuseCommands(kls)
+
             kls.__whirlwind_command__ = True
             kls.__whirlwind_ws_only__ = is_interactive(kls) or parent
 
