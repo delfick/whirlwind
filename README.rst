@@ -6,7 +6,7 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
-0.7 - TBD
+0.7 - 3 February 2020
     * Made transform_progress responsible for name spacing the progress messages
     * Store commands can now be interactive. If you define the execute method as
       taking in ``messages``, then you can process extra messages sent to that

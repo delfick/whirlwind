@@ -1,4 +1,4 @@
-VERSION = "0.6"
+VERSION = "0.7"
 
 __doc__ = """
 A wrapper around the tornado web server.
