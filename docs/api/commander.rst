@@ -163,11 +163,17 @@ PUT /v1/commands ``{"command": "three"}``
             return super().process(exc_type, exc, tb)
 
     class CommandHandler(CommandHandler):
+        # You can disable automatic logging of exceptions by saying
+        # log_exceptions = False
+
         def initialize(self, *args, **kwargs):
             super().initialize(*args, **kwargs)
             self.message_from_exc = MyMessageFromExc()
 
     class WSHandler(WSHandler):
+        # You can disable automatic logging of exceptions by saying
+        # log_exceptions = False
+
         def initialize(self, *args, **kwargs):
             super().initialize(*args, **kwargs)
             self.message_from_exc = MyMessageFromExc()

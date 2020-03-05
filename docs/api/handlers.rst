@@ -300,3 +300,18 @@ This is useful for the ``commander`` functionality of whirlwind where the body
 of the command can be specified with the ``__body__`` file.
 
 You can then access the files in your handler by accessing ``self.request.files``
+
+Logging of exceptions
+---------------------
+
+By default the ``Simple`` and ``SimpleWebSocketBase`` handlers will log
+exceptions when the request raises an exception. You can prevent this by
+providing the handler with a ``log_exceptions = False`` class attribute:
+
+.. code-block:: python
+
+    class Handler(Simple):
+        log_exceptions = False
+
+        async def do_get(self):
+            raise ValueError("error")

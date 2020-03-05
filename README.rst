@@ -10,6 +10,8 @@ Changlog
     * Made it possible to accept files into a commander command. You can do this
       by sending a ``multipart/form-data`` to the endpoint. The body of the
       command will be extracted from a ``__body__`` file you provide.
+    * HTTP and WebSocket handlers can now be told not to log exceptions by giving
+      them a class level ``log_exceptions = False`` attribute.
 
 0.7 - 3 February 2020
     * Made transform_progress responsible for name spacing the progress messages

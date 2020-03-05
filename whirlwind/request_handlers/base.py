@@ -28,6 +28,9 @@ def reprer(o):
 
 
 class MessageFromExc:
+    def __init__(self, *, log_exceptions=True):
+        self.log_exceptions = log_exceptions
+
     def __call__(self, exc_type, exc, tb):
         if isinstance(exc, Finished):
             return exc.kwargs
@@ -35,7 +38,6 @@ class MessageFromExc:
             return self.process(exc_type, exc, tb)
 
     def process(self, exc_type, exc, tb):
-        log.error(exc, exc_info=(exc_type, exc, tb))
         return {
             "status": 500,
             "error": "Internal Server Error",
@@ -122,7 +124,9 @@ class RequestsMixin:
     @property
     def message_from_exc(self):
         if not hasattr(self, "_message_from_exc"):
-            self._message_from_exc = MessageFromExc()
+            self._message_from_exc = MessageFromExc(
+                log_exceptions=getattr(self, "log_exceptions", True)
+            )
         return self._message_from_exc
 
     @message_from_exc.setter
@@ -224,6 +228,8 @@ class Simple(RequestsMixin, RequestHandler):
     * delete
     """
 
+    log_exceptions = True
+
     async def get(self, *args, **kwargs):
         if not hasattr(self, "do_get"):
             raise HTTPError(405)
@@ -292,6 +298,8 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
 
     It relies on the client side closing the connection when it's finished.
     """
+
+    log_exceptions = True
 
     def initialize(self, server_time, wsconnections):
         self.server_time = server_time
@@ -400,7 +408,7 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
 
                 if not res.cancelled():
                     exc = res.exception()
-                    if exc:
+                    if exc and self.log_exceptions:
                         log.exception(exc, exc_info=(type(exc), exc, exc.__traceback__))
 
             t = create_task(doit(), name=f"<process_command: {body}>")
