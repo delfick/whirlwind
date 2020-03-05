@@ -38,6 +38,9 @@ class MessageFromExc:
             return self.process(exc_type, exc, tb)
 
     def process(self, exc_type, exc, tb):
+        if self.log_exceptions:
+            log.error(exc, exc_info=(exc_type, exc, tb))
+
         return {
             "status": 500,
             "error": "Internal Server Error",

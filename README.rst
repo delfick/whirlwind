@@ -6,6 +6,10 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
+0.7.2 - 6 March 2020
+    * Fix a small mistake that meant http handlers weren't logging even if
+      ``log_exceptions=False`` wasn't specified.
+
 0.7.1 - 6 March 2020
     * Made it possible to accept files into a commander command. You can do this
       by sending a ``multipart/form-data`` to the endpoint. The body of the
