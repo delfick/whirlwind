@@ -6,7 +6,7 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
-0.7.1 - TBD
+0.7.1 - 6 March 2020
     * Made it possible to accept files into a commander command. You can do this
       by sending a ``multipart/form-data`` to the endpoint. The body of the
       command will be extracted from a ``__body__`` file you provide.
