@@ -287,3 +287,16 @@ For example:
 
       async def process_message(self, path, body, message_id, message_key, progress_cb):
           return {"closing": True}
+
+Sending files to an endpoint
+----------------------------
+
+You can send files to an endpoint by sending a normal ``multipart/form-data``
+request. If you specify a ``__body__`` file then when you say
+``self.body_as_json()`` it will get treat that file as the ``body`` of the
+request.
+
+This is useful for the ``commander`` functionality of whirlwind where the body
+of the command can be specified with the ``__body__`` file.
+
+You can then access the files in your handler by accessing ``self.request.files``

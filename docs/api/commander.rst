@@ -313,3 +313,22 @@ If you want to change how the progress_cb works then you can do something like:
 signature ``def __call__(self, body, message, do_log=True, **kwargs)`` where
 ``body`` is the body of the request and ``message`` is the message to give back
 as progress.
+
+Sending files to a command
+--------------------------
+
+You can send files to a command by sending a normal ``multipart/form-data``
+request. To also specify the body of the command you would normally send with
+the PUT request, have a ``__body__`` file in your reqest.
+
+You can then access the files by doing something like:
+
+.. code-block:: python
+
+    @store.command("my_command")
+    class MyCOmmand(store.Command):
+        handler = store.injected("handler")
+
+        async def execute(self):
+            fle = self.handler.request.files["my_attachment"][0]["body"]
+            return {"my_attachment_size": len(fle)}

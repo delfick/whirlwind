@@ -133,9 +133,17 @@ class RequestsMixin:
         return AsyncCatcher(self, info, final=final)
 
     def body_as_json(self, body=None):
-        """Return the body of the request as a json object"""
+        """
+        Return the body of the request as a json object
+
+        If there is a special ``__body__`` file in the request, we will consider this
+        to be the body instead of the request body
+        """
         if body is None:
-            body = self.request.body.decode()
+            if "__body__" in self.request.files:
+                body = self.request.files["__body__"][0]["body"].decode()
+            else:
+                body = self.request.body.decode()
 
         try:
             if type(body) is str:

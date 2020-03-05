@@ -3,6 +3,7 @@
 from whirlwind.request_handlers.base import Simple, Finished, reprer
 
 from tornado.testing import AsyncHTTPTestCase
+from tornado.httputil import HTTPHeaders
 import tornado
 import asyncio
 import uuid
@@ -28,6 +29,47 @@ describe AsyncHTTPTestCase, "Simple without error":
                     response = self.fetch("/", method=method, body=body)
 
             assert response.code == 405
+
+    describe "Getting body as json from files":
+
+        def get_app(self):
+            self.path = "/path"
+
+            class FilledSimple(Simple):
+                async def process(s):
+                    return {
+                        "body": s.body_as_json(),
+                        "file": s.request.files["attachment"][0]["body"].decode(),
+                        "filename": s.request.files["attachment"][0]["filename"],
+                    }
+
+                do_put = process
+                do_post = process
+
+            return tornado.web.Application([(self.path, FilledSimple)])
+
+        it "works":
+            boundary = "------WebKitFormBoundaryjdGa6A5qLy18abKk"
+            attachment = 'Content-Disposition: form-data; name="attachment"; filename="thing.txt"\r\nContent-Type: text/plain\r\n\r\nhello there\n'
+            args = 'Content-Disposition: form-data; name="__body__"; filename="blob"\r\nContent-Type: application/json\r\n\r\n{"command":"attachments/add"}'
+            body = f"{boundary}\r\n{attachment}\r\n{boundary}\r\n{args}\r\n{boundary}--"
+            headers = HTTPHeaders(
+                {
+                    "content-type": "multipart/form-data; boundary=----WebKitFormBoundaryjdGa6A5qLy18abKk"
+                }
+            )
+
+            for method in ("POST", "PUT"):
+                response = self.fetch(self.path, method="POST", body=body.encode(), headers=headers)
+
+                expected = {
+                    "body": {"command": "attachments/add"},
+                    "file": "hello there\n",
+                    "filename": "thing.txt",
+                }
+
+                assert response.code == 200
+                assert json.loads(response.body.decode()) == expected
 
     describe "Uses reprer":
 

@@ -6,6 +6,11 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
+0.7.1 - TBD
+    * Made it possible to accept files into a commander command. You can do this
+      by sending a ``multipart/form-data`` to the endpoint. The body of the
+      command will be extracted from a ``__body__`` file you provide.
+
 0.7 - 3 February 2020
     * Made transform_progress responsible for name spacing the progress messages
     * Store commands can now be interactive. If you define the execute method as
