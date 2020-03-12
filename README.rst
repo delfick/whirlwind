@@ -6,7 +6,7 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
-0.8.0 - TBD
+0.8.0 - 12 March 2020
     * The status of a response when there is an exception will now look at:
 
       * If the msg is a dictionary, it'll get "status" from that dictionary if it has that
