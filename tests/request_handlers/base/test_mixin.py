@@ -69,6 +69,24 @@ describe AsyncHTTPTestCase, "RequestsMixin":
                         except ValueError as error:
                             kwargs["msg"] = {"error": "error"}
                             kwargs["exc_info"] = sys.exc_info()
+
+                    elif "exception_status" in body and "exception_response" in body:
+
+                        if body["exception_status"]:
+
+                            class Exc(Exception):
+                                status = body["exception_status"]
+
+                        else:
+
+                            class Exc(Exception):
+                                pass
+
+                        try:
+                            raise Exc()
+                        except Exception as error:
+                            kwargs["msg"] = body["exception_response"]
+                            kwargs["exc_info"] = sys.exc_info()
                     else:
 
                         class Thing:
@@ -116,6 +134,24 @@ describe AsyncHTTPTestCase, "RequestsMixin":
             assert response.code == 501
             self.assertResponse(response, {"tree": "branch"})
             assert response.headers.get("Content-Type") == "application/json; charset=UTF-8"
+
+        it "overrides status with status on exception if there is one":
+            body = {"exception_status": 418, "exception_response": {"something": 1}}
+            response = self.fetch(self.path, method="POST", body=json.dumps(body))
+            assert response.code == 418
+            self.assertResponse(response, {"something": 1})
+
+        it "overrides status with status in response msg if one":
+            body = {"exception_status": None, "exception_response": {"status": 598}}
+            response = self.fetch(self.path, method="POST", body=json.dumps(body))
+            assert response.code == 598
+            self.assertResponse(response, {"status": 598})
+
+        it "status for exceptions is otherwise 500":
+            body = {"exception_status": None, "exception_response": {"things": "wat"}}
+            response = self.fetch(self.path, method="POST", body=json.dumps(body))
+            assert response.code == 500
+            self.assertResponse(response, {"things": "wat"})
 
         it "empty body if msg is None":
             body = {"msg": None}

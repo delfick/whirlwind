@@ -83,14 +83,11 @@ class AsyncCatcher(object):
         else:
             self.final(msg, exc_info=exc_info)
 
-    def complete(self, msg, status=200, exc_info=None):
+    def complete(self, msg, status=sb.NotSpecified, exc_info=None):
         if type(msg) is dict:
             result = json.loads(json.dumps(msg, default=self.request.reprer, indent="    "))
         else:
             result = msg
-
-        if type(result) is dict:
-            status = result.get("status", status)
 
         self.send_msg(result, status=status, exc_info=exc_info)
 
@@ -161,7 +158,7 @@ class RequestsMixin:
 
         return body
 
-    def send_msg(self, msg, status=200, exc_info=None):
+    def send_msg(self, msg, status=sb.NotSpecified, exc_info=None):
         """
         This determines what content-type and exact body to write to the response
 
@@ -187,8 +184,17 @@ class RequestsMixin:
 
         self.hook("process_reply", msg, exc_info=exc_info)
 
-        if type(msg) is dict:
-            status = msg.get("status", status)
+        if type(msg) is dict and "status" in msg:
+            status = msg["status"]
+        elif exc_info and exc_info[1]:
+            if hasattr(exc_info[1], "status"):
+                status = exc_info[1].status
+            else:
+                status = 500
+
+        if status is sb.NotSpecified:
+            status = 200
+
         self.set_status(status)
 
         if type(msg) is dict and "html" in msg:

@@ -6,6 +6,13 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
+0.8.0 - TBD
+    * The status of a response when there is an exception will now look at:
+
+      * If the msg is a dictionary, it'll get "status" from that dictionary if it has that
+      * If the exception has a "status" property, the status will be that value
+      * Otherwise the status will be 500
+
 0.7.2 - 6 March 2020
     * Fix a small mistake that meant http handlers weren't logging even if
       ``log_exceptions=False`` wasn't specified.
