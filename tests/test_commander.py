@@ -1,7 +1,6 @@
 # coding: spec
 
 from whirlwind.commander import Commander
-from whirlwind import test_helpers as thp
 from whirlwind.store import Store
 
 from delfick_project.option_merge import MergedOptionStringFormatter, BadOptionFormat, MergedOptions

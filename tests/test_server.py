@@ -84,9 +84,7 @@ describe "setup":
             self.patch_tornado_routes.start()
 
             server = Server(self.final_future)
-            t = thp.async_as_background(
-                server.serve(self.host, self.port, *self.args, **self.kwargs)
-            )
+            thp.async_as_background(server.serve(self.host, self.port, *self.args, **self.kwargs))
             await asyncio.sleep(0.1)
 
             return self.routes, self.setup, self.FakeApplication

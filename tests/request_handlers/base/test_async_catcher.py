@@ -4,7 +4,6 @@ from whirlwind.request_handlers.base import AsyncCatcher, Finished, MessageFromE
 
 from unittest import mock
 import binascii
-import asyncio
 import pytest
 import types
 import uuid
@@ -142,7 +141,6 @@ describe "AsyncCatcher":
                     send_msg.assert_called_once_with(thing, status=status, exc_info=V.exc_info)
 
             async it "sends status as what was given to complete", V:
-                status = mock.Mock(name="status")
                 thing = {"status": 300}
                 send_msg = mock.Mock(name="send_msg")
                 with mock.patch.object(V.catcher, "send_msg", send_msg):
@@ -150,7 +148,6 @@ describe "AsyncCatcher":
                 send_msg.assert_called_once_with(thing, status=418, exc_info=None)
 
             async it "reprs random objects", V:
-                result = str(uuid.uuid1())
                 V.request.reprer = reprer
 
                 class Other:

@@ -14,10 +14,8 @@ from delfick_project.option_merge import MergedOptionStringFormatter
 from delfick_project.norms import dictobj, sb, Meta, BadSpecValue
 from delfick_project.errors_pytest import assertRaises
 from unittest import mock
-import inspect
 import asyncio
 import uuid
-import sys
 
 describe "Store":
     it "takes in some things":
@@ -341,7 +339,7 @@ describe "Store":
             ):
 
                 @store.command("command", parent=W)
-                class Command(store.Command):
+                class Command2(store.Command):
                     pass
 
 
@@ -576,7 +574,7 @@ describe "command_spec":
 
             for t in runners:
                 if t.done() and not t.cancelled():
-                    res = await t
+                    await t
 
             for t in runners:
                 if t.done():

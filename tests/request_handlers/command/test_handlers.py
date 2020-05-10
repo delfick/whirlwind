@@ -1,16 +1,11 @@
 # coding: spec
 
 from whirlwind.request_handlers.command import WSHandler, CommandHandler
-from whirlwind.server import Server, wait_for_futures
 from whirlwind.request_handlers.base import reprer
-from whirlwind import test_helpers as thp
-from whirlwind.commander import Command
 from whirlwind.store import NoSuchPath
 
-from functools import partial
 from unittest import mock
 import asynctest
-import asyncio
 import pytest
 import time
 

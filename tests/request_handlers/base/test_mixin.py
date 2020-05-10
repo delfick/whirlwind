@@ -66,7 +66,7 @@ describe AsyncHTTPTestCase, "RequestsMixin":
                     elif "error" in body:
                         try:
                             raise ValueError(body["error"])
-                        except ValueError as error:
+                        except ValueError:
                             kwargs["msg"] = {"error": "error"}
                             kwargs["exc_info"] = sys.exc_info()
 
@@ -84,7 +84,7 @@ describe AsyncHTTPTestCase, "RequestsMixin":
 
                         try:
                             raise Exc()
-                        except Exception as error:
+                        except Exception:
                             kwargs["msg"] = body["exception_response"]
                             kwargs["exc_info"] = sys.exc_info()
                     else:

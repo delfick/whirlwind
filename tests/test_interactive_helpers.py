@@ -278,22 +278,6 @@ describe "MessageHolder":
             assert item.execute is None
             assert item.messages is holder
 
-        async it "can be given a command without execute", holder:
-            fut = asyncio.Future()
-            execute = mock.Mock(name="execute")
-            command = mock.Mock(name="command")
-
-            await holder.add(fut, command, execute)
-            assert holder.ts == [(fut, False, True)]
-
-            item = await holder.queue.get()
-            assert isinstance(item, ProcessItem)
-
-            assert item.fut is fut
-            assert item.command is command
-            assert item.execute is execute
-            assert item.messages is holder
-
     describe "async iteration":
 
         @pytest.fixture()
@@ -390,7 +374,7 @@ describe "MessageHolder":
                 await t1
             with assertRaises(asyncio.CancelledError):
                 await t2
-            assert (await t3) is "DONE"
+            assert (await t3) == "DONE"
 
         async it "cancels tasks if cancelled is true":
             t1 = asyncio.Future()
@@ -411,7 +395,7 @@ describe "MessageHolder":
                 await t1
             with assertRaises(asyncio.CancelledError):
                 await t2
-            assert (await t3) is "DONE"
+            assert (await t3) == "DONE"
 
         async it "does not cancel not do_cancel tasks if cancelled is false and main_task not errored":
             t1 = asyncio.Future()

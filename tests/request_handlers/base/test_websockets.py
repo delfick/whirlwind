@@ -1,15 +1,10 @@
 # coding: spec
 
 from whirlwind.request_handlers.base import SimpleWebSocketBase, Finished, MessageFromExc
-from whirlwind import test_helpers as thp
-from whirlwind.server import Server
 
-from contextlib import contextmanager
 from unittest import mock
-import asynctest
 import asyncio
 import pytest
-import socket
 import types
 import time
 import uuid
@@ -307,7 +302,6 @@ describe "SimpleWebSocketBase":
 
     async it "message_done can be used to close the connection", make_wrapper:
         info = {"message_key": None}
-        error = ValueError("NOPE")
         called = []
 
         class Handler(SimpleWebSocketBase):
@@ -359,7 +353,7 @@ describe "SimpleWebSocketBase":
                 connection,
                 {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id},
             )
-            res = await server.runner.ws_read(connection)
+            await server.runner.ws_read(connection)
             assert server.wsconnections == {}
 
             connection.close()
@@ -388,7 +382,7 @@ describe "SimpleWebSocketBase":
             assert not f2.done()
 
         assert len(server.wsconnections) == 0
-        assert f2.result() == True
+        assert f2.result() is True
 
     async it "can stay open", make_wrapper:
         message_info = {"keys": set(), "message_keys": []}
@@ -480,7 +474,7 @@ describe "SimpleWebSocketBase":
                 await server.runner.ws_write(connection, body)
                 res = await server.runner.ws_read(connection)
                 assert res is not None, "Got no reply to : '{}'".format(body)
-                assert res["message_id"] == None
+                assert res["message_id"] is None
                 assert "reply" in res
                 assert "error" in res["reply"]
 
