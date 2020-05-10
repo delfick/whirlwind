@@ -35,6 +35,35 @@ class Stop(store.Command):
     pass
 
 
+@store.command("processing")
+class Processing(store.Command):
+    handler = store.injected("request_handler")
+    progress_cb = store.injected("progress_cb")
+
+    async def execute(self, messages):
+        self.progress_cb("started")
+        async for message in messages:
+            assert message.command.handler is self.handler
+            await message.process()
+
+
+@store.command("a_command", parent=Processing)
+class Acommand(store.Command):
+    handler = store.injected("request_handler")
+
+    async def execute(self):
+        return "boring"
+
+
+@store.command("cancel_connection_fut", parent=Processing)
+class CancelConnectionFut(store.Command):
+    handler = store.injected("request_handler")
+
+    async def execute(self):
+        self.handler.connection_future.cancel()
+        return "cancelled"
+
+
 @store.command("interactive_with_error_receiving")
 class InteractiveWithErrorRecieving(store.Command):
     progress_cb = store.injected("progress_cb")
@@ -149,7 +178,7 @@ class WSHandler(WSHandler):
         self.message_from_exc = MessageFromExc()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def final_future():
     fut = asyncio.Future()
     try:
@@ -158,7 +187,7 @@ def final_future():
         fut.cancel()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 async def runner(server_wrapper, final_future):
     def tornado_routes(server):
         return [
@@ -179,6 +208,26 @@ async def runner(server_wrapper, final_future):
 
 
 describe "Interactive commands":
+
+    async it "the parent is finished when it's connection future is finished", runner, asserter, final_future:
+        async with runner.ws_stream(asserter) as stream:
+            await stream.start("/v1", {"command": "processing"})
+            message_id = stream.message_id
+            await stream.check_reply({"progress": {"info": "started"}})
+
+            child_message_id = str(uuid.uuid1())
+            await stream.start(
+                "/v1", {"command": "a_command"}, message_id=[message_id, child_message_id]
+            )
+            await stream.check_reply("boring", message_id=[message_id, child_message_id])
+
+            child_message_id = str(uuid.uuid1())
+            await stream.start(
+                "/v1",
+                {"command": "cancel_connection_fut"},
+                message_id=[message_id, child_message_id],
+            )
+            await stream.check_reply("cancelled", message_id=[message_id, child_message_id])
 
     async it "it can start and control interactive commands", runner, asserter:
         async with runner.ws_stream(asserter) as stream:
@@ -337,7 +386,7 @@ describe "Interactive commands":
             await stream.check_reply({"progress": {"Echo2": {"stop": True}}})
             await stream.check_reply({"done": True})
 
-    async it "exceptions from processing a command rise", runner, asserter:
+    async it "exceptions from processing a command rise", runner, asserter, final_future:
         async with runner.ws_stream(asserter) as stream:
             await stream.start("/v1", {"command": "interactive_with_sub_interactive"})
             message_id = stream.message_id

@@ -464,6 +464,7 @@ describe "command_spec":
 
         runners = [asyncio.Future()]
         final_future = asyncio.Future()
+        request_future = asyncio.Future()
 
         def progress_cb(msg, **kwargs):
             if isinstance(msg, Exception):
@@ -480,6 +481,7 @@ describe "command_spec":
                 {
                     "message_id": message_id,
                     "final_future": final_future,
+                    "request_future": request_future,
                     "progress_cb": progress_cb,
                     **kwargs,
                 },

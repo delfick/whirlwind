@@ -315,9 +315,9 @@ class command_spec(sb.Spec):
                 if not existing:
                     return await command.execute()
                 else:
-                    final_future = meta.everything.get("final_future")
+                    request_future = meta.everything.get("request_future")
                     return await self.execute_interactive(
-                        final_future, parent_existing, existing, command
+                        request_future, parent_existing, existing, command
                     )
             finally:
                 if message_id_tuple in self.existing_commands:
@@ -325,11 +325,11 @@ class command_spec(sb.Spec):
 
         return execute
 
-    async def execute_interactive(self, final_future, parent_existing, existing, command):
+    async def execute_interactive(self, request_future, parent_existing, existing, command):
         holder_kls = MessageHolder
         if hasattr(command, "MessageHolder"):
             holder_kls = command.MessageHolder
-        existing["messages"] = holder_kls(command, final_future)
+        existing["messages"] = holder_kls(command, request_future)
 
         async def execute():
             try:

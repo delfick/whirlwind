@@ -106,7 +106,9 @@ class WSHandler(SimpleWebSocketBase, ProcessReplyMixin):
             executor = self.commander.executor(
                 progress_cb, self, message_key=message_key, message_id=message_id
             )
-            return await executor.execute(path, body, allow_ws_only=True)
+            return await executor.execute(
+                path, body, allow_ws_only=True, request_future=self.connection_future
+            )
         except NoSuchPath as error:
             raise Finished(
                 status=404,
