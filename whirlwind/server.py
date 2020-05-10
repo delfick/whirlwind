@@ -58,8 +58,6 @@ async def wait_for_futures(futures):
 
     Useful for waiting on the wsconnections object given to a WSHandler
     """
-    for t in list(futures.values()):
-        try:
-            await t
-        except:
-            pass
+    ts = list(futures.values())
+    if ts:
+        await asyncio.wait(ts)
