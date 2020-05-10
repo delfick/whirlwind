@@ -93,9 +93,9 @@ class CommandHandler(Simple, ProcessReplyMixin):
 class WSHandler(SimpleWebSocketBase, ProcessReplyMixin):
     progress_maker = ProgressMessageMaker
 
-    def initialize(self, server_time, wsconnections, commander):
+    def initialize(self, final_future, server_time, wsconnections, commander):
         self.commander = commander
-        super().initialize(server_time, wsconnections)
+        super().initialize(final_future, server_time, wsconnections)
 
     def transform_progress(self, body, progress, stack_extra=0, **kwargs):
         maker = self.progress_maker(2 + stack_extra)

@@ -11,19 +11,36 @@ import uuid
 
 
 @pytest.fixture()
-def make_wrapper(server_wrapper):
+def final_future():
+    fut = asyncio.Future()
+    try:
+        yield fut
+    finally:
+        fut.cancel()
+
+
+@pytest.fixture()
+def make_wrapper(server_wrapper, final_future):
     def make_wrapper(Handler):
         def tornado_routes(server):
             return [
                 (
                     "/v1/ws",
                     Handler,
-                    {"server_time": time.time(), "wsconnections": server.wsconnections},
+                    {
+                        "final_future": final_future,
+                        "server_time": time.time(),
+                        "wsconnections": server.wsconnections,
+                    },
                 ),
                 (
                     "/v1/ws_no_server_time",
                     Handler,
-                    {"server_time": None, "wsconnections": server.wsconnections},
+                    {
+                        "final_future": final_future,
+                        "server_time": None,
+                        "wsconnections": server.wsconnections,
+                    },
                 ),
             ]
 

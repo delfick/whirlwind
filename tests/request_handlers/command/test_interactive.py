@@ -9,6 +9,7 @@ from delfick_project.option_merge.formatter import MergedOptionStringFormatter
 from delfick_project.errors import DelfickError
 from delfick_project.norms import dictobj, sb
 from unittest import mock
+import asyncio
 import pytest
 import time
 import uuid
@@ -149,13 +150,23 @@ class WSHandler(WSHandler):
 
 
 @pytest.fixture(scope="module")
-async def runner(server_wrapper):
+def final_future():
+    fut = asyncio.Future()
+    try:
+        yield fut
+    finally:
+        fut.cancel()
+
+
+@pytest.fixture(scope="module")
+async def runner(server_wrapper, final_future):
     def tornado_routes(server):
         return [
             (
                 "/v1/ws",
                 WSHandler,
                 {
+                    "final_future": final_future,
                     "commander": Commander(store, final_future=server.final_future),
                     "server_time": time.time(),
                     "wsconnections": server.wsconnections,

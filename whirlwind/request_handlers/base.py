@@ -310,8 +310,9 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
 
     log_exceptions = True
 
-    def initialize(self, server_time, wsconnections):
+    def initialize(self, final_future, server_time, wsconnections):
         self.server_time = server_time
+        self.final_future = final_future
         self.wsconnections = wsconnections
 
     class WSMessage(dictobj.Spec):

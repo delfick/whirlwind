@@ -6,6 +6,7 @@ from whirlwind.store import NoSuchPath
 
 from unittest import mock
 import asynctest
+import asyncio
 import pytest
 import time
 
@@ -22,7 +23,16 @@ def better_reprer(o):
 
 
 @pytest.fixture()
-def make_wrapper(server_wrapper):
+def final_future():
+    fut = asyncio.Future()
+    try:
+        yield fut
+    finally:
+        fut.cancel()
+
+
+@pytest.fixture()
+def make_wrapper(server_wrapper, final_future):
     def make_wrapper(commander):
         class WSH(WSHandler):
             def initialize(s, *args, **kwargs):
@@ -42,6 +52,7 @@ def make_wrapper(server_wrapper):
                     {
                         "commander": commander,
                         "server_time": time.time(),
+                        "final_future": final_future,
                         "wsconnections": server.wsconnections,
                     },
                 ),

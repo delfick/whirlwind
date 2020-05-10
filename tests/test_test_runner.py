@@ -26,6 +26,7 @@ def tornado_routes(server):
             "/v1/ws",
             WSHandler,
             {
+                "final_future": server.final_future,
                 "commander": server.commander,
                 "server_time": server.server_time,
                 "wsconnections": server.wsconnections,
