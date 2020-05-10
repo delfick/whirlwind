@@ -73,6 +73,73 @@ describe "SimpleWebSocketBase":
             connection.close()
             assert await server.runner.ws_read(connection) is None
 
+    async it "has cancelled connection fut if final_future already done", make_wrapper, final_future:
+        final_future.cancel()
+
+        called = []
+
+        class Handler(SimpleWebSocketBase):
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
+                assert s.connection_future.done()
+                called.append("processed")
+                return "blah"
+
+        message_id = str(uuid.uuid1())
+        async with make_wrapper(Handler) as server:
+            connection = await server.runner.ws_connect(
+                skip_hook=True, path="/v1/ws_no_server_time"
+            )
+            await server.runner.ws_write(
+                connection,
+                {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id},
+            )
+            res = await server.runner.ws_read(connection)
+            assert res == {"reply": "blah", "message_id": message_id}
+
+            connection.close()
+            assert await server.runner.ws_read(connection) is None
+
+        assert called == ["processed"]
+
+    async it "cancels connection fut if final_future gets fulfilled done", make_wrapper, final_future:
+        info = {}
+        called = []
+
+        class Handler(SimpleWebSocketBase):
+            async def process_message(s, path, body, message_id, message_key, progress_cb):
+                called.append("processing")
+                await asyncio.wait([s.connection_future])
+                called.append("processed")
+                return info["value"]
+
+        message_id = str(uuid.uuid1())
+        assert not final_future._callbacks
+
+        async with make_wrapper(Handler) as server:
+            connection = await server.runner.ws_connect(
+                skip_hook=True, path="/v1/ws_no_server_time"
+            )
+            await server.runner.ws_write(
+                connection,
+                {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id},
+            )
+
+            await asyncio.sleep(0.1)
+            assert called == ["processing"]
+
+            assert len(final_future._callbacks) == 1
+            final_future.cancel()
+            info["value"] = "VALUE"
+            res = await server.runner.ws_read(connection)
+            assert not final_future._callbacks
+
+            assert res == {"reply": "VALUE", "message_id": message_id}
+
+            connection.close()
+            assert await server.runner.ws_read(connection) is None
+
+        assert called == ["processing", "processed"]
+
     async it "knows when the connection has closed", make_wrapper:
         done = asyncio.Future()
 

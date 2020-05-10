@@ -330,6 +330,16 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
     def open(self):
         self.key = str(uuid.uuid1())
         self.connection_future = asyncio.Future()
+        if self.final_future.done():
+            self.connection_future.cancel()
+            return
+
+        canceller = lambda res: self.connection_future.cancel()
+        self.final_future.add_done_callback(canceller)
+        self.connection_future.add_done_callback(
+            lambda res: self.final_future.remove_done_callback(canceller)
+        )
+
         if self.server_time is not None:
             self.reply(self.server_time, message_id="__server_time__")
         self.hook("websocket_opened")
