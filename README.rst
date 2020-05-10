@@ -6,6 +6,13 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
+0.9.0 - TBD
+    * The SimpleWebSocketBase and WSHandler handlers now take in a
+      ``final_future`` which is used to stop the websocket stream when it is
+      cancelled.
+    * Websocket streams that take in child messages will now use the request
+      future on the websocket to know when to stop.
+
 0.8.0 - 12 March 2020
     * The status of a response when there is an exception will now look at:
 
