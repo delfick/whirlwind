@@ -40,7 +40,9 @@ class Executor:
         self.extra_options = extra_options
         self.request_handler = request_handler
 
-    async def execute(self, path, body, extra_options=None, allow_ws_only=False):
+    async def execute(
+        self, path, body, extra_options=None, allow_ws_only=False, request_future=None
+    ):
         """
         Responsible for creating a command and calling execute on it.
 
@@ -62,12 +64,17 @@ class Executor:
             This executor
 
         request_future
-            A future that is cancelled after execute is finished
+            A future that is cancelled after execute is finished. This is the
+            one passed in or a new Future for this request.
+
+            At the end of the execute, the request future is cancelled, unless it
+            was provided, in which case it is left alone.
 
         extra options
             Anything provided as extra_options to this function
         """
-        request_future = asyncio.Future()
+        provided = request_future is not None
+        request_future = request_future or asyncio.Future()
         request_future._merged_options_formattable = True
 
         try:
@@ -93,4 +100,5 @@ class Executor:
 
             return await execute()
         finally:
-            request_future.cancel()
+            if not provided:
+                request_future.cancel()

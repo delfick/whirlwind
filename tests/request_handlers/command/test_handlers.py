@@ -65,7 +65,9 @@ describe "WSHandler and CommandHandler":
                 s.progress_cb = progress_cb
                 s.request_handler = request_handler
 
-            async def execute(s, path, body, extra_options=None, allow_ws_only=False):
+            async def execute(
+                s, path, body, extra_options=None, allow_ws_only=False, request_future=None
+            ):
                 assert allow_ws_only == do_allow_ws_only
                 assert isinstance(s.request_handler, handlerKls)
                 s.progress_cb("information", one=1, thing=Thing())

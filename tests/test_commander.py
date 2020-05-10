@@ -7,6 +7,7 @@ from delfick_project.option_merge import MergedOptionStringFormatter, BadOptionF
 from delfick_project.norms import dictobj, sb, BadSpecValue
 from delfick_project.errors_pytest import assertRaises
 from unittest import mock
+import asyncio
 import uuid
 
 store = Store(default_path="/v1", formatter=MergedOptionStringFormatter)
@@ -90,6 +91,32 @@ describe "Commander":
         assert thing.store is store
 
         assert thing.request_future.done()
+
+    async it "can be given a specific request future":
+        other = mock.Mock(name="other")
+        progress_cb = mock.Mock(name="progress_cb")
+        request_handler = mock.Mock(name="request_handler")
+        commander = Commander(store, other=other)
+        override_request_future = asyncio.Future()
+
+        value = str(uuid.uuid1())
+        thing, val = await commander.executor(progress_cb, request_handler).execute(
+            "/v1",
+            {"command": "thing", "args": {"value": value}},
+            request_future=override_request_future,
+        )
+
+        assert val == value
+
+        assert thing.request_future is override_request_future
+        assert thing.other is other
+        assert thing.commander is commander
+        assert thing.progress_cb is progress_cb
+        assert thing.request_handler is request_handler
+        assert thing.path == "/v1"
+        assert thing.store is store
+
+        assert not thing.request_future.done()
 
     async it "can be given an executor":
         other = mock.Mock(name="other")
