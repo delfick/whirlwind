@@ -5,7 +5,6 @@ from whirlwind.request_handlers.base import reprer
 from whirlwind.store import NoSuchPath
 
 from unittest import mock
-import asynctest
 import asyncio
 import pytest
 import time
@@ -88,13 +87,13 @@ describe "WSHandler and CommandHandler":
         commander.executor.side_effect = Executor
         return commander
 
-    async it "WSHandler calls out to commander.execute", make_wrapper, asserter:
+    async it "WSHandler calls out to commander.execute", make_wrapper:
         commander = self.make_commander(WSHandler, do_allow_ws_only=True)
 
         message_id = None
 
         async with make_wrapper(commander) as server:
-            async with server.runner.ws_stream(asserter) as stream:
+            async with server.ws_stream() as stream:
                 await stream.start("/v1/somewhere", {"command": "one"})
                 message_id = stream.message_id
                 await stream.check_reply(
@@ -118,29 +117,29 @@ describe "WSHandler and CommandHandler":
                     }
                 )
 
-    async it "CommandHandler calls out to commander.execute", make_wrapper, asserter:
+    async it "CommandHandler calls out to commander.execute", make_wrapper:
         commander = self.make_commander(CommandHandler, do_allow_ws_only=False)
 
         async with make_wrapper(commander) as server:
-            await server.runner.assertPUT(
-                asserter,
+            await server.assertHTTP(
+                "PUT",
                 "/v1/somewhere",
-                {"command": "one"},
+                {"json": {"command": "one"}},
                 json_output={"success": True, "thing": {"special": "<|<THING>|>"}},
             )
 
-    async it "raises 404 if the path is invalid", make_wrapper, asserter:
+    async it "raises 404 if the path is invalid", make_wrapper:
         commander = self.make_commander(CommandHandler, do_allow_ws_only=False)
         executor = mock.Mock(name="executor")
-        executor.execute = asynctest.mock.CoroutineMock(name="execute")
+        executor.execute = pytest.helpers.AsyncMock(name="execute")
         executor.execute.side_effect = NoSuchPath(wanted="/v1/other", available=["/v1/somewhere"])
         commander.executor = mock.Mock(name="executor()", return_value=executor)
 
         async with make_wrapper(commander) as server:
-            await server.runner.assertPUT(
-                asserter,
+            await server.assertHTTP(
+                "PUT",
                 "/v1/other",
-                {"command": "one"},
+                {"json": {"command": "one"}},
                 status=404,
                 json_output={
                     "status": 404,
@@ -150,7 +149,7 @@ describe "WSHandler and CommandHandler":
                 },
             )
 
-            async with server.runner.ws_stream(asserter) as stream:
+            async with server.ws_stream() as stream:
                 await stream.start("/v1/other", {"command": "one"})
                 await stream.check_reply(
                     {

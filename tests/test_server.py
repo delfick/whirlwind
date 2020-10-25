@@ -1,11 +1,10 @@
 # coding: spec
 
 from whirlwind.server import wait_for_futures, Server
-from whirlwind import test_helpers as thp
 
 from unittest import mock
-import asynctest
 import asyncio
+import pytest
 
 describe "wait_for_futures":
 
@@ -61,8 +60,8 @@ describe "setup":
             self.FakeHTTPServer = mock.Mock(name="HTTPServer", return_value=self.http_server)
             self.FakeApplication = mock.Mock(name="Application", return_value=self.application)
 
-            self.setup = asynctest.mock.CoroutineMock(name="setup", return_value=setup_return)
-            self.cleanup = asynctest.mock.CoroutineMock(name="cleanup")
+            self.setup = pytest.helpers.AsyncMock(name="setup", return_value=setup_return)
+            self.cleanup = pytest.helpers.AsyncMock(name="cleanup")
             self.tornado_routes = mock.Mock(name="tornado_routes", return_value=self.routes)
 
             self.patchHTTPServer = mock.patch("whirlwind.server.HTTPServer", self.FakeHTTPServer)
@@ -84,7 +83,9 @@ describe "setup":
             self.patch_tornado_routes.start()
 
             server = Server(self.final_future)
-            thp.async_as_background(server.serve(self.host, self.port, *self.args, **self.kwargs))
+            asyncio.get_event_loop().create_task(
+                server.serve(self.host, self.port, *self.args, **self.kwargs)
+            )
             await asyncio.sleep(0.1)
 
             return self.routes, self.setup, self.FakeApplication

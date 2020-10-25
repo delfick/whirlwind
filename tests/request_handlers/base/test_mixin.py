@@ -1,62 +1,67 @@
 # coding: spec
 
-from whirlwind.request_handlers.base import Simple
+from whirlwind.request_handlers import Simple
 
-from tornado.testing import AsyncHTTPTestCase
 from unittest import mock
-import tornado
+import pytest
 import types
 import uuid
-import json
 import sys
 
-describe AsyncHTTPTestCase, "RequestsMixin":
-
-    def assertResponse(self, response, expected):
-        assert json.loads(response.body.decode()) == expected
+describe "RequestsMixin":
 
     describe "body as json":
 
-        def get_app(self):
-            self.path = "/blah"
-
+        @pytest.fixture()
+        async def server(self, server_wrapper):
             class Handler(Simple):
                 async def do_post(s):
                     return str(s.body_as_json())
 
-            return tornado.web.Application([(self.path, Handler)])
+            async with server_wrapper(None, lambda s: [("/", Handler)]) as server:
+                yield server
 
-        it "complains if the body is empty":
-            response = self.fetch(self.path, body="", method="POST")
-            assert response.code == 400
-            self.assertResponse(
-                response,
-                {"reason": "Failed to load body as json", "error": mock.ANY, "status": 400},
+        async it "complains if the body is empty", server:
+            await server.assertHTTP(
+                "POST",
+                "/",
+                {"data": ""},
+                status=400,
+                json_output={
+                    "reason": "Failed to load body as json",
+                    "error": mock.ANY,
+                    "status": 400,
+                },
             )
 
-        it "complains if the body is not valid json":
-            response = self.fetch(self.path, body="{", method="POST")
-            assert response.code == 400
-            self.assertResponse(
-                response,
-                {"reason": "Failed to load body as json", "error": mock.ANY, "status": 400},
-            )
+        async it "complains if the body is not valid json", server:
+            await server.assertHTTP(
+                "POST",
+                "/",
+                {"data": "{"},
+                status=400,
+                json_output={
+                    "reason": "Failed to load body as json",
+                    "error": mock.ANY,
+                    "status": 400,
+                },
+            ),
 
-        it "returns as a dictionary if valid":
+        async it "returns as a dictionary if valid", server:
             body = {"one": "two", "three": None, "four": [1, 2]}
-            response = self.fetch(self.path, body=json.dumps(body), method="POST")
-            assert response.code == 200
-            assert response.body == str(body).encode()
+            await server.assertHTTP("POST", "/", {"json": body}, status=200, text_output=str(body))
 
     describe "send_msg":
 
-        def get_app(self):
-            self.path = "/blah"
-            self.replies = []
+        @pytest.fixture()
+        def replies(self):
+            return []
 
+        @pytest.fixture()
+        async def server(self, server_wrapper, replies):
             class Handler(Simple):
                 def process_reply(s, msg, exc_info=None):
-                    return self.replies.append((msg, exc_info))
+                    return replies.append((msg, exc_info))
 
                 async def do_post(s):
                     body = s.body_as_json()
@@ -100,103 +105,118 @@ describe AsyncHTTPTestCase, "RequestsMixin":
 
                     s.send_msg(**kwargs)
 
-            return tornado.web.Application([(self.path, Handler)])
+            async with server_wrapper(None, lambda s: [("/", Handler)]) as server:
+                yield server
 
-        it "calls as_dict on the message if it has that":
-            response = self.fetch(self.path, method="POST", body="{}")
-            assert response.code == 200
-            self.assertResponse(response, {"blah": "meh"})
-            assert response.headers.get("Content-Type") == "application/json; charset=UTF-8"
+        async it "calls as_dict on the message if it has that", server:
+            await server.assertHTTP(
+                "POST",
+                "/",
+                {"json": {}},
+                status=200,
+                json_output={"blah": "meh"},
+                expected_headers={"Content-Type": "application/json; charset=UTF-8"},
+            )
 
-        it "is application/json if a list":
+        async it "is application/json if a list", server:
             body = {"msg": [1, 2, 3]}
-            response = self.fetch(self.path, method="POST", body=json.dumps(body))
-            assert response.code == 200
-            self.assertResponse(response, [1, 2, 3])
-            assert response.headers.get("Content-Type") == "application/json; charset=UTF-8"
+            await server.assertHTTP("POST", "/", {"json": body}, status=200, json_output=[1, 2, 3])
 
-        it "overrides status with what is in the msg":
+        async it "overrides status with what is in the msg", server:
             body = {"msg": {"status": 400, "tree": "branch"}}
-            response = self.fetch(self.path, method="POST", body=json.dumps(body))
-            assert response.code == 400
-            self.assertResponse(response, {"status": 400, "tree": "branch"})
-            assert response.headers.get("Content-Type") == "application/json; charset=UTF-8"
+            await server.assertHTTP(
+                "POST",
+                "/",
+                {"json": body},
+                status=400,
+                json_output={"status": 400, "tree": "branch"},
+            )
 
             body = {"msg": {"status": 400, "tree": "branch"}, "status": 500}
-            response = self.fetch(self.path, method="POST", body=json.dumps(body))
-            assert response.code == 400
-            self.assertResponse(response, {"status": 400, "tree": "branch"})
-            assert response.headers.get("Content-Type") == "application/json; charset=UTF-8"
+            await server.assertHTTP(
+                "POST",
+                "/",
+                {"json": body},
+                status=400,
+                json_output={"status": 400, "tree": "branch"},
+            )
 
-        it "uses status passed in if no status in msg":
+        async it "uses status passed in if no status in msg", server:
             body = {"msg": {"tree": "branch"}, "status": 501}
-            response = self.fetch(self.path, method="POST", body=json.dumps(body))
-            assert response.code == 501
-            self.assertResponse(response, {"tree": "branch"})
-            assert response.headers.get("Content-Type") == "application/json; charset=UTF-8"
+            await server.assertHTTP(
+                "POST", "/", {"json": body}, status=501, json_output={"tree": "branch"}
+            )
 
-        it "overrides status with status on exception if there is one":
+        async it "overrides status with status on exception if there is one", server:
             body = {"exception_status": 418, "exception_response": {"something": 1}}
-            response = self.fetch(self.path, method="POST", body=json.dumps(body))
-            assert response.code == 418
-            self.assertResponse(response, {"something": 1})
+            await server.assertHTTP(
+                "POST", "/", {"json": body}, status=418, json_output={"something": 1}
+            )
 
-        it "overrides status with status in response msg if one":
+        async it "overrides status with status in response msg if one", server:
             body = {"exception_status": None, "exception_response": {"status": 598}}
-            response = self.fetch(self.path, method="POST", body=json.dumps(body))
-            assert response.code == 598
-            self.assertResponse(response, {"status": 598})
+            await server.assertHTTP(
+                "POST", "/", {"json": body}, status=598, json_output={"status": 598}
+            )
 
-        it "status for exceptions is otherwise 500":
+        async it "status for exceptions is otherwise 500", server:
             body = {"exception_status": None, "exception_response": {"things": "wat"}}
-            response = self.fetch(self.path, method="POST", body=json.dumps(body))
-            assert response.code == 500
-            self.assertResponse(response, {"things": "wat"})
+            await server.assertHTTP(
+                "POST", "/", {"json": body}, status=500, json_output={"things": "wat"}
+            )
 
-        it "empty body if msg is None":
+        async it "empty body if msg is None", server:
             body = {"msg": None}
-            response = self.fetch(self.path, method="POST", body=json.dumps(body))
-            assert response.code == 200
-            assert response.body == b""
+            await server.assertHTTP("POST", "/", {"json": body}, status=200, text_output="")
 
-        it "treats html as html":
+        async it "treats html as html", server:
             msg = "<html><body/></html>"
             body = {"msg": msg}
-            response = self.fetch(self.path, method="POST", body=json.dumps(body))
-            assert response.code == 200
-            assert response.body == msg.encode()
-            assert response.headers.get("Content-Type") == "text/html; charset=UTF-8"
+            await server.assertHTTP(
+                "POST",
+                "/",
+                {"json": body},
+                status=200,
+                text_output=msg,
+                expected_headers={"Content-Type": "text/html; charset=UTF-8"},
+            )
 
             msg = "<!DOCTYPE html><html><body/></html>"
-            body = {"msg": msg}
-            response = self.fetch(self.path, method="POST", body=json.dumps(body))
-            assert response.code == 200
-            assert response.body == msg.encode()
-            assert response.headers.get("Content-Type") == "text/html; charset=UTF-8"
-
             body = {"msg": msg, "status": 500}
-            response = self.fetch(self.path, method="POST", body=json.dumps(body))
-            assert response.code == 500
-            assert response.body == msg.encode()
-            assert response.headers.get("Content-Type") == "text/html; charset=UTF-8"
+            await server.assertHTTP(
+                "POST",
+                "/",
+                {"json": body},
+                status=500,
+                text_output=msg,
+                expected_headers={"Content-Type": "text/html; charset=UTF-8"},
+            )
 
-        it "treats string as text/plain":
+        async it "treats string as text/plain", server:
             msg = str(uuid.uuid1())
             body = {"msg": msg}
-            response = self.fetch(self.path, method="POST", body=json.dumps(body))
-            assert response.code == 200
-            assert response.body == msg.encode()
-            assert response.headers.get("Content-Type") == "text/plain; charset=UTF-8"
+            await server.assertHTTP(
+                "POST",
+                "/",
+                {"json": body},
+                status=200,
+                text_output=msg,
+                expected_headers={"Content-Type": "text/plain; charset=UTF-8"},
+            )
 
             body = {"msg": msg, "status": 403}
-            response = self.fetch(self.path, method="POST", body=json.dumps(body))
-            assert response.code == 403
-            assert response.body == msg.encode()
-            assert response.headers.get("Content-Type") == "text/plain; charset=UTF-8"
+            await server.assertHTTP(
+                "POST",
+                "/",
+                {"json": body},
+                status=403,
+                text_output=msg,
+                expected_headers={"Content-Type": "text/plain; charset=UTF-8"},
+            )
 
-        it "processes replies":
-            self.fetch(self.path, method="POST", body=json.dumps({"msg": "one"}))
-            assert self.replies.pop(0) == ("one", None)
+        async it "processes replies", server, replies:
+            await server.assertHTTP("POST", "/", {"json": {"msg": "one"}}, status=200)
+            assert replies.pop(0) == ("one", None)
 
             class ATraceback:
                 def __eq__(self, other):
@@ -209,11 +229,11 @@ describe AsyncHTTPTestCase, "RequestsMixin":
                 def __eq__(self, other):
                     return isinstance(other, ValueError) and str(other) == self.msg
 
-            self.fetch(self.path, method="POST", body=json.dumps({"error": "wat"}))
-            assert self.replies.pop(0) == (
+            await server.assertHTTP("POST", "/", {"json": {"error": "wat"}}, status=500)
+            assert replies.pop(0) == (
                 {"error": "error"},
                 (ValueError, AValueError("wat"), ATraceback()),
             )
 
             # Make sure we got all of them
-            assert self.replies == []
+            assert replies == []

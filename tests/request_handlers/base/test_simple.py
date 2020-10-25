@@ -2,20 +2,20 @@
 
 from whirlwind.request_handlers.base import Simple, Finished, reprer
 
-from tornado.testing import AsyncHTTPTestCase
 from tornado.httputil import HTTPHeaders
-import tornado
 import asyncio
+import pytest
 import uuid
-import json
 
-describe AsyncHTTPTestCase, "Simple without error":
+describe "Simple without error":
     describe "With no methods":
 
-        def get_app(self):
-            return tornado.web.Application([("/", Simple)])
+        @pytest.fixture()
+        async def server(self, server_wrapper):
+            async with server_wrapper(None, lambda s: [("/", Simple)]) as server:
+                yield server
 
-        it "gets method not supported for all the methods":
+        async it "gets method not supported for all the methods", server:
             for method, body in (
                 ("GET", None),
                 ("POST", b""),
@@ -24,17 +24,14 @@ describe AsyncHTTPTestCase, "Simple without error":
                 ("PATCH", b""),
             ):
                 if body is None:
-                    response = self.fetch("/", method=method)
+                    await server.assertHTTP(method, "/", {}, status=405)
                 else:
-                    response = self.fetch("/", method=method, body=body)
-
-            assert response.code == 405
+                    await server.assertHTTP(method, "/", {"data": body}, status=405)
 
     describe "Getting body as json from files":
 
-        def get_app(self):
-            self.path = "/path"
-
+        @pytest.fixture()
+        async def server(self, server_wrapper):
             class FilledSimple(Simple):
                 async def process(s):
                     return {
@@ -46,9 +43,10 @@ describe AsyncHTTPTestCase, "Simple without error":
                 do_put = process
                 do_post = process
 
-            return tornado.web.Application([(self.path, FilledSimple)])
+            async with server_wrapper(None, lambda s: [("/", FilledSimple)]) as server:
+                yield server
 
-        it "works":
+        async it "works", server:
             boundary = "------WebKitFormBoundaryjdGa6A5qLy18abKk"
             attachment = 'Content-Disposition: form-data; name="attachment"; filename="thing.txt"\r\nContent-Type: text/plain\r\n\r\nhello there\n'
             args = 'Content-Disposition: form-data; name="__body__"; filename="blob"\r\nContent-Type: application/json\r\n\r\n{"command":"attachments/add"}'
@@ -60,23 +58,23 @@ describe AsyncHTTPTestCase, "Simple without error":
             )
 
             for method in ("POST", "PUT"):
-                response = self.fetch(self.path, method="POST", body=body.encode(), headers=headers)
-
                 expected = {
                     "body": {"command": "attachments/add"},
                     "file": "hello there\n",
                     "filename": "thing.txt",
                 }
-
-                assert response.code == 200
-                assert json.loads(response.body.decode()) == expected
+                await server.assertHTTP(
+                    "POST",
+                    "/",
+                    {"data": body.encode(), "headers": headers},
+                    status=200,
+                    json_output=expected,
+                )
 
     describe "Uses reprer":
 
-        def get_app(self):
-            self.path = "/path"
-            self.result = str(uuid.uuid1())
-
+        @pytest.fixture()
+        async def server(self, server_wrapper):
             class Thing:
                 def __special_repr__(self):
                     return {"special": "|<>THING<>|"}
@@ -97,253 +95,270 @@ describe AsyncHTTPTestCase, "Simple without error":
                 async def do_post(s):
                     return {"body": s.body_as_json(), "thing": Thing()}
 
-            return tornado.web.Application([(self.path, FilledSimple)])
+            async with server_wrapper(None, lambda s: [("/", FilledSimple)]) as server:
+                yield server
 
-        it "works":
-            response = self.fetch(self.path)
-            assert response.code == 200
-            assert json.loads(response.body.decode()) == {"thing": {"special": "|<>THING<>|"}}
+        async it "works", server:
+            await server.assertHTTP(
+                "GET", "/", {}, status=200, json_output={"thing": {"special": "|<>THING<>|"}}
+            )
 
-            response = self.fetch(self.path, method="POST", body=json.dumps({"one": True}))
-            assert response.code == 200
-            assert json.loads(response.body.decode()) == {
+            expected = {
                 "thing": {"special": "|<>THING<>|"},
                 "body": {"one": True},
             }
+            await server.assertHTTP(
+                "POST", "/", {"json": {"one": True}}, status=200, json_output=expected
+            )
 
-    describe "With Get":
+    describe "With GET":
 
-        def get_app(self):
-            self.path = "/info/blah/one/two"
-            self.result = str(uuid.uuid1())
+        @pytest.fixture()
+        def result(self):
+            return str(uuid.uuid1())
 
+        @pytest.fixture()
+        async def server(self, server_wrapper, result):
             class FilledSimple(Simple):
                 async def do_get(s, *, one, two):
                     assert one == "one"
                     assert two == "two"
                     assert s.request.path == "/info/blah/one/two"
-                    return self.result
+                    return result
 
-            return tornado.web.Application([("/info/blah/(?P<one>.*)/(?P<two>.*)", FilledSimple)])
+            path = "/info/blah/(?P<one>.*)/(?P<two>.*)"
+            async with server_wrapper(None, lambda s: [(path, FilledSimple)]) as server:
+                yield server
 
-        it "allows GET requests":
-            response = self.fetch(self.path)
-            assert response.code == 200
-            assert response.body == self.result.encode()
+        async it "allows GET requests", server, result:
+            await server.assertHTTP("GET", "/info/blah/one/two", {}, status=200, text_output=result)
 
-    describe "With Post":
+    describe "With POST":
 
-        def get_app(self):
-            self.path = "/info/blah/one/two"
-            self.body = str(uuid.uuid1())
-            self.result = str(uuid.uuid1())
+        @pytest.fixture()
+        def body(self):
+            return str(uuid.uuid1())
 
+        @pytest.fixture()
+        def result(self):
+            return str(uuid.uuid1())
+
+        @pytest.fixture()
+        async def server(self, server_wrapper, body, result):
             class FilledSimple(Simple):
                 async def do_post(s, one, two):
                     assert one == "one"
                     assert two == "two"
                     assert s.request.path == "/info/blah/one/two"
-                    assert s.request.body == self.body.encode()
-                    return self.result
+                    assert s.request.body == body.encode()
+                    return result
 
-            return tornado.web.Application([("/info/blah/(.*)/(.*)", FilledSimple)])
+            path = "/info/blah/(.*)/(.*)"
+            async with server_wrapper(None, lambda s: [(path, FilledSimple)]) as server:
+                yield server
 
-        it "allows POST requests":
-            response = self.fetch(self.path, method="POST", body=self.body)
-            assert response.code == 200
-            assert response.body == self.result.encode()
+        async it "allows POST requests", server, body, result:
+            path = "/info/blah/one/two"
+            await server.assertHTTP("POST", path, {"data": body}, status=200, text_output=result)
 
-    describe "With Put":
+    describe "With PUT":
 
-        def get_app(self):
-            self.path = "/info/blah/one/two"
-            self.body = str(uuid.uuid1())
-            self.result = str(uuid.uuid1())
+        @pytest.fixture()
+        def body(self):
+            return str(uuid.uuid1())
 
+        @pytest.fixture()
+        def result(self):
+            return str(uuid.uuid1())
+
+        @pytest.fixture()
+        async def server(self, server_wrapper, body, result):
             class FilledSimple(Simple):
-                async def do_put(s, *, one, two):
+                async def do_put(s, one, two):
                     assert one == "one"
                     assert two == "two"
                     assert s.request.path == "/info/blah/one/two"
-                    assert s.request.body == self.body.encode()
-                    return self.result
+                    assert s.request.body == body.encode()
+                    return result
 
-            return tornado.web.Application([("/info/blah/(?P<one>.*)/(?P<two>.*)", FilledSimple)])
+            path = "/info/blah/(.*)/(.*)"
+            async with server_wrapper(None, lambda s: [(path, FilledSimple)]) as server:
+                yield server
 
-        it "allows PUT requests":
-            response = self.fetch(self.path, method="PUT", body=self.body)
-            assert response.code == 200
-            assert response.body == self.result.encode()
+        async it "allows PUT requests", server, body, result:
+            path = "/info/blah/one/two"
+            await server.assertHTTP("PUT", path, {"data": body}, status=200, text_output=result)
 
-    describe "With Patch":
+    describe "With PATCH":
 
-        def get_app(self):
-            self.path = "/info/blah/one/two"
-            self.body = str(uuid.uuid1())
-            self.result = str(uuid.uuid1())
+        @pytest.fixture()
+        def body(self):
+            return str(uuid.uuid1())
 
+        @pytest.fixture()
+        def result(self):
+            return str(uuid.uuid1())
+
+        @pytest.fixture()
+        async def server(self, server_wrapper, body, result):
             class FilledSimple(Simple):
                 async def do_patch(s, one, two):
                     assert one == "one"
                     assert two == "two"
                     assert s.request.path == "/info/blah/one/two"
-                    assert s.request.body == self.body.encode()
-                    return self.result
+                    assert s.request.body == body.encode()
+                    return result
 
-            return tornado.web.Application([("/info/blah/(.*)/(.*)", FilledSimple)])
+            path = "/info/blah/(.*)/(.*)"
+            async with server_wrapper(None, lambda s: [(path, FilledSimple)]) as server:
+                yield server
 
-        it "allows PATCH requests":
-            response = self.fetch(self.path, method="PATCH", body=self.body)
-            assert response.code == 200
-            assert response.body == self.result.encode()
+        async it "allows PATCH requests", server, body, result:
+            path = "/info/blah/one/two"
+            await server.assertHTTP("PATCH", path, {"data": body}, status=200, text_output=result)
 
-    describe "With Delete":
+    describe "With DELETE":
 
-        def get_app(self):
-            self.path = "/info/blah/one/two"
-            self.result = str(uuid.uuid1())
+        @pytest.fixture()
+        def body(self):
+            return str(uuid.uuid1())
 
+        @pytest.fixture()
+        def result(self):
+            return str(uuid.uuid1())
+
+        @pytest.fixture()
+        async def server(self, server_wrapper, body, result):
             class FilledSimple(Simple):
-                async def do_delete(s, *, one, two):
+                async def do_delete(s, one, two):
                     assert one == "one"
                     assert two == "two"
                     assert s.request.path == "/info/blah/one/two"
-                    return self.result
+                    assert s.request.body == body.encode()
+                    return result
 
-            return tornado.web.Application([("/info/blah/(?P<one>.*)/(?P<two>.*)", FilledSimple)])
+            path = "/info/blah/(.*)/(.*)"
+            async with server_wrapper(None, lambda s: [(path, FilledSimple)]) as server:
+                yield server
 
-        it "allows DELETE requests":
-            response = self.fetch(self.path, method="DELETE")
-            assert response.code == 200
-            assert response.body == self.result.encode()
+        async it "allows DELETE requests", server, body, result:
+            path = "/info/blah/one/two"
+            await server.assertHTTP("DELETE", path, {"data": body}, status=200, text_output=result)
 
-# This is so the send_msg logic in AsyncCatcher works
-describe AsyncHTTPTestCase, "no ws_connection object":
 
-    def get_app(self):
-        self.path = "/info/blah"
-        self.f = asyncio.Future()
+describe "no ws_connection object":
 
+    @pytest.fixture()
+    def fut(self):
+        return asyncio.get_event_loop().create_future()
+
+    @pytest.fixture()
+    async def server(self, fut, server_wrapper):
         class FilledSimple(Simple):
             async def do_get(s):
                 s.send_msg({"other": "stuff"})
                 assert not hasattr(s, "ws_connection")
-                self.f.set_result(True)
+                fut.set_result(True)
                 return {"thing": "blah"}
 
-        return tornado.web.Application([(self.path, FilledSimple)])
+        async with server_wrapper(None, lambda s: [("/", FilledSimple)]) as server:
+            yield server
 
-    it "ha no ws_connection":
-        response = self.fetch(self.path)
-        assert json.loads(response.body.decode()) == {"other": "stuff"}
-        assert self.f.done()
+    async it "has no ws_connection", server, fut:
+        await server.assertHTTP("GET", "/", {}, status=200, json_output={"other": "stuff"})
+        assert fut.done()
 
-describe AsyncHTTPTestCase, "Simple with error":
+describe "Simple with error":
 
-    def assert_correct_response(self, response, status, body):
-        assert response.code == status
-        assert json.dumps(body, sort_keys=True) == json.dumps(
-            json.loads(response.body.decode()), sort_keys=True
-        )
-        assert response.headers["Content-Type"] == "application/json; charset=UTF-8"
+    @pytest.fixture()
+    def reason(self):
+        return str(uuid.uuid1())
 
-    describe "With Get":
+    @pytest.fixture()
+    def path(self):
+        return "/info/blah"
 
-        def get_app(self):
-            self.path = "/info/blah"
-            self.reason = str(uuid.uuid1())
+    describe "With GET":
 
+        @pytest.fixture()
+        async def server(self, server_wrapper, reason, path):
             class FilledSimple(Simple):
                 async def do_get(s):
-                    assert s.request.path == "/info/blah"
-                    raise Finished(status=501, reason=self.reason)
+                    assert s.request.path == path
+                    raise Finished(status=501, reason=reason)
 
-            return tornado.web.Application([(self.path, FilledSimple)])
+            async with server_wrapper(None, lambda s: [(path, FilledSimple)]) as server:
+                yield server
 
-        it "allows GET requests":
-            response = self.fetch(self.path)
-            self.assert_correct_response(
-                response, status=501, body={"status": 501, "reason": self.reason}
+        async it "allows GET requests", server, path, reason:
+            await server.assertHTTP(
+                "GET", path, {}, status=501, json_output={"status": 501, "reason": reason}
             )
 
-    describe "With Post":
+    describe "With POST":
 
-        def get_app(self):
-            self.path = "/info/blah"
-            self.body = str(uuid.uuid1())
-            self.reason = str(uuid.uuid1())
-
+        @pytest.fixture()
+        async def server(self, server_wrapper, reason, path):
             class FilledSimple(Simple):
                 async def do_post(s):
-                    assert s.request.path == "/info/blah"
-                    assert s.request.body == self.body.encode()
-                    raise Finished(status=501, reason=self.reason)
+                    assert s.request.path == path
+                    raise Finished(status=501, reason=reason)
 
-            return tornado.web.Application([(self.path, FilledSimple)])
+            async with server_wrapper(None, lambda s: [(path, FilledSimple)]) as server:
+                yield server
 
-        it "allows POST requests":
-            response = self.fetch(self.path, method="POST", body=self.body)
-            self.assert_correct_response(
-                response, status=501, body={"status": 501, "reason": self.reason}
+        async it "allows POST requests", server, path, reason:
+            await server.assertHTTP(
+                "POST", path, {}, status=501, json_output={"status": 501, "reason": reason}
             )
 
-    describe "With Put":
+    describe "With PUT":
 
-        def get_app(self):
-            self.path = "/info/blah"
-            self.body = str(uuid.uuid1())
-            self.reason = str(uuid.uuid1())
-
+        @pytest.fixture()
+        async def server(self, server_wrapper, reason, path):
             class FilledSimple(Simple):
                 async def do_put(s):
-                    assert s.request.path == "/info/blah"
-                    assert s.request.body == self.body.encode()
-                    raise Finished(status=501, reason=self.reason)
+                    assert s.request.path == path
+                    raise Finished(status=501, reason=reason)
 
-            return tornado.web.Application([(self.path, FilledSimple)])
+            async with server_wrapper(None, lambda s: [(path, FilledSimple)]) as server:
+                yield server
 
-        it "allows PUT requests":
-            response = self.fetch(self.path, method="PUT", body=self.body)
-            self.assert_correct_response(
-                response, status=501, body={"status": 501, "reason": self.reason}
+        async it "allows PUT requests", server, path, reason:
+            await server.assertHTTP(
+                "PUT", path, {}, status=501, json_output={"status": 501, "reason": reason}
             )
 
-    describe "With Patch":
+    describe "With PATCH":
 
-        def get_app(self):
-            self.path = "/info/blah"
-            self.body = str(uuid.uuid1())
-            self.reason = str(uuid.uuid1())
-
+        @pytest.fixture()
+        async def server(self, server_wrapper, reason, path):
             class FilledSimple(Simple):
                 async def do_patch(s):
-                    assert s.request.path == "/info/blah"
-                    assert s.request.body == self.body.encode()
-                    raise Finished(status=501, reason=self.reason)
+                    assert s.request.path == path
+                    raise Finished(status=501, reason=reason)
 
-            return tornado.web.Application([(self.path, FilledSimple)])
+            async with server_wrapper(None, lambda s: [(path, FilledSimple)]) as server:
+                yield server
 
-        it "allows PATCH requests":
-            response = self.fetch(self.path, method="PATCH", body=self.body)
-            self.assert_correct_response(
-                response, status=501, body={"status": 501, "reason": self.reason}
+        async it "allows PATCH requests", server, path, reason:
+            await server.assertHTTP(
+                "PATCH", path, {}, status=501, json_output={"status": 501, "reason": reason}
             )
 
-    describe "With Delete":
+    describe "With DELETE":
 
-        def get_app(self):
-            self.path = "/info/blah"
-            self.reason = str(uuid.uuid1())
-
+        @pytest.fixture()
+        async def server(self, server_wrapper, reason, path):
             class FilledSimple(Simple):
                 async def do_delete(s):
-                    assert s.request.path == "/info/blah"
-                    raise Finished(status=501, reason=self.reason)
+                    assert s.request.path == path
+                    raise Finished(status=501, reason=reason)
 
-            return tornado.web.Application([(self.path, FilledSimple)])
+            async with server_wrapper(None, lambda s: [(path, FilledSimple)]) as server:
+                yield server
 
-        it "allows DELETE requests":
-            response = self.fetch(self.path, method="DELETE")
-            self.assert_correct_response(
-                response, status=501, body={"status": 501, "reason": self.reason}
+        async it "allows DELETE requests", server, path, reason:
+            await server.assertHTTP(
+                "DELETE", path, {}, status=501, json_output={"status": 501, "reason": reason}
             )

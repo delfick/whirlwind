@@ -188,7 +188,7 @@ def final_future():
 
 
 @pytest.fixture()
-async def runner(server_wrapper, final_future):
+async def server(server_wrapper, final_future):
     def tornado_routes(server):
         return [
             (
@@ -204,13 +204,13 @@ async def runner(server_wrapper, final_future):
         ]
 
     async with server_wrapper(store, tornado_routes) as server:
-        yield server.runner
+        yield server
 
 
 describe "Interactive commands":
 
-    async it "the parent is finished when it's connection future is finished", runner, asserter, final_future:
-        async with runner.ws_stream(asserter) as stream:
+    async it "the parent is finished when it's connection future is finished", server, final_future:
+        async with server.ws_stream() as stream:
             await stream.start("/v1", {"command": "processing"})
             message_id = stream.message_id
             await stream.check_reply({"progress": {"info": "started"}})
@@ -229,8 +229,8 @@ describe "Interactive commands":
             )
             await stream.check_reply("cancelled", message_id=[message_id, child_message_id])
 
-    async it "it can start and control interactive commands", runner, asserter:
-        async with runner.ws_stream(asserter) as stream:
+    async it "it can start and control interactive commands", server:
+        async with server.ws_stream() as stream:
             await stream.start("/v1", {"command": "interactive"})
             message_id = stream.message_id
             await stream.check_reply({"progress": {"info": "started"}})
@@ -242,8 +242,8 @@ describe "Interactive commands":
             await stream.check_reply({"received": True}, message_id=[message_id, child_message_id])
             await stream.check_reply({"done": True})
 
-    async it "can fail if we fail to read from messages properly", runner, asserter:
-        async with runner.ws_stream(asserter) as stream:
+    async it "can fail if we fail to read from messages properly", server:
+        async with server.ws_stream() as stream:
             await stream.start("/v1", {"command": "interactive_with_error_receiving"})
             message_id = stream.message_id
             await stream.check_reply({"progress": {"info": "started"}})
@@ -257,8 +257,8 @@ describe "Interactive commands":
             await stream.check_reply(error, message_id=[message_id, child_message_id])
             await stream.check_reply(error)
 
-    async it "can fail if we fail to process a command", runner, asserter:
-        async with runner.ws_stream(asserter) as stream:
+    async it "can fail if we fail to process a command", server:
+        async with server.ws_stream() as stream:
             await stream.start("/v1", {"command": "interactive_with_error_after_receive"})
             message_id = stream.message_id
             await stream.check_reply({"progress": {"info": "started"}})
@@ -272,8 +272,8 @@ describe "Interactive commands":
             await stream.check_reply(error, message_id=[message_id, child_message_id])
             await stream.check_reply(error)
 
-    async it "can fail after we process a command", runner, asserter:
-        async with runner.ws_stream(asserter) as stream:
+    async it "can fail after we process a command", server:
+        async with server.ws_stream() as stream:
             await stream.start("/v1", {"command": "interactive_with_error_after_process"})
             message_id = stream.message_id
             await stream.check_reply({"progress": {"info": "started"}})
@@ -293,8 +293,8 @@ describe "Interactive commands":
             error = {"error_code": "DelfickError", "error": {"message": "NUP", "fail": True}}
             await stream.check_reply(error)
 
-    async it "can have sub interactives", runner, asserter:
-        async with runner.ws_stream(asserter) as stream:
+    async it "can have sub interactives", server:
+        async with server.ws_stream() as stream:
             await stream.start("/v1", {"command": "interactive_with_sub_interactive"})
             message_id = stream.message_id
             await stream.check_reply({"progress": {"info": "started"}})
@@ -386,8 +386,8 @@ describe "Interactive commands":
             await stream.check_reply({"progress": {"Echo2": {"stop": True}}})
             await stream.check_reply({"done": True})
 
-    async it "exceptions from processing a command rise", runner, asserter, final_future:
-        async with runner.ws_stream(asserter) as stream:
+    async it "exceptions from processing a command rise", server, final_future:
+        async with server.ws_stream() as stream:
             await stream.start("/v1", {"command": "interactive_with_sub_interactive"})
             message_id = stream.message_id
             await stream.check_reply({"progress": {"info": "started"}})

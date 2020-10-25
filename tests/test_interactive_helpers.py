@@ -4,7 +4,6 @@ from whirlwind.store import pass_on_result, ProcessItem, MessageHolder
 
 from delfick_project.errors_pytest import assertRaises
 from unittest import mock
-import asynctest
 import asyncio
 import pytest
 
@@ -21,7 +20,7 @@ describe "pass_on_result":
             else:
                 kwargs["return_value"] = side_effect
 
-            execute = asynctest.mock.CoroutineMock(name="task", **kwargs)
+            execute = pytest.helpers.AsyncMock(name="task", **kwargs)
             if on_command:
                 command.execute = execute
                 execute = None
@@ -184,7 +183,7 @@ describe "ProcessItem":
         def item_maker(self, messages):
             def make_item(fut, side_effect, on_command=True):
                 command = mock.Mock(name="command")
-                execute = asynctest.mock.CoroutineMock(name="execute")
+                execute = pytest.helpers.AsyncMock(name="execute")
 
                 if isinstance(side_effect, BaseException):
                     execute.side_effect = side_effect

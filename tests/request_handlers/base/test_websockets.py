@@ -20,8 +20,8 @@ def final_future():
 
 
 @pytest.fixture()
-def make_wrapper(server_wrapper, final_future):
-    def make_wrapper(Handler):
+def make_server(server_wrapper, final_future):
+    def make_server(Handler):
         def tornado_routes(server):
             return [
                 (
@@ -46,36 +46,25 @@ def make_wrapper(server_wrapper, final_future):
 
         return server_wrapper(None, tornado_routes)
 
-    return make_wrapper
+    return make_server
 
 
 describe "SimpleWebSocketBase":
 
-    @pytest.mark.async_timeout(200)
-    async it "does not have server_time message if that is set to None", make_wrapper:
+    async it "does not have server_time message if that is set to None", make_server:
 
         class Handler(SimpleWebSocketBase):
             async def process_message(s, path, body, message_id, message_key, progress_cb):
                 return "blah"
 
-        message_id = str(uuid.uuid1())
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect(
-                skip_hook=True, path="/v1/ws_no_server_time"
-            )
-            await server.runner.ws_write(
-                connection,
-                {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id},
-            )
-            res = await server.runner.ws_read(connection)
-            assert res == {"reply": "blah", "message_id": message_id}
+        async with make_server(Handler) as server:
+            async with server.ws_stream(
+                path="/v1/ws_no_server_time", gives_server_time=False
+            ) as stream:
+                message_id = await stream.start("/one/two", {"hello": "there"})
+                await stream.check_reply("blah", message_id=message_id)
 
-            connection.close()
-            assert await server.runner.ws_read(connection) is None
-
-    async it "has cancelled connection fut if final_future already done", make_wrapper, final_future:
-        final_future.cancel()
-
+    async it "has cancelled connection fut if final_future already done", make_server, final_future:
         called = []
 
         class Handler(SimpleWebSocketBase):
@@ -84,24 +73,15 @@ describe "SimpleWebSocketBase":
                 called.append("processed")
                 return "blah"
 
-        message_id = str(uuid.uuid1())
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect(
-                skip_hook=True, path="/v1/ws_no_server_time"
-            )
-            await server.runner.ws_write(
-                connection,
-                {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id},
-            )
-            res = await server.runner.ws_read(connection)
-            assert res == {"reply": "blah", "message_id": message_id}
-
-            connection.close()
-            assert await server.runner.ws_read(connection) is None
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                final_future.cancel()
+                message_id = await stream.start("/one/two", {"hello": "there"})
+                await stream.check_reply("blah", message_id=message_id)
 
         assert called == ["processed"]
 
-    async it "cancels connection fut if final_future gets fulfilled done", make_wrapper, final_future:
+    async it "cancels connection fut if final_future gets fulfilled done", make_server, final_future:
         info = {}
         called = []
 
@@ -112,35 +92,25 @@ describe "SimpleWebSocketBase":
                 called.append("processed")
                 return info["value"]
 
-        message_id = str(uuid.uuid1())
         assert not final_future._callbacks
 
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect(
-                skip_hook=True, path="/v1/ws_no_server_time"
-            )
-            await server.runner.ws_write(
-                connection,
-                {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id},
-            )
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                message_id = await stream.start("/one/two", {"hello": "there"})
 
-            await asyncio.sleep(0.1)
-            assert called == ["processing"]
+                await asyncio.sleep(0.1)
+                assert called == ["processing"]
 
-            assert len(final_future._callbacks) == 1
-            final_future.cancel()
-            info["value"] = "VALUE"
-            res = await server.runner.ws_read(connection)
-            assert not final_future._callbacks
+                assert len(final_future._callbacks) == 1
+                final_future.cancel()
+                info["value"] = "VALUE"
 
-            assert res == {"reply": "VALUE", "message_id": message_id}
-
-            connection.close()
-            assert await server.runner.ws_read(connection) is None
+                await stream.check_reply("VALUE", message_id=message_id)
+                assert not final_future._callbacks
 
         assert called == ["processing", "processed"]
 
-    async it "knows when the connection has closed", make_wrapper:
+    async it "knows when the connection has closed", make_server:
         done = asyncio.Future()
 
         class Handler(SimpleWebSocketBase):
@@ -151,27 +121,17 @@ describe "SimpleWebSocketBase":
                 except asyncio.CancelledError:
                     done.set_result(True)
 
-        message_id = str(uuid.uuid1())
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect(
-                skip_hook=True, path="/v1/ws_no_server_time"
-            )
-            await server.runner.ws_write(
-                connection,
-                {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id},
-            )
-            res = await server.runner.ws_read(connection)
-            assert res == {"reply": {"progress": {"hello": "there"}}, "message_id": message_id}
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                message_id = await stream.start("/one/two", {"hello": "there"})
+                await stream.check_reply({"progress": {"hello": "there"}}, message_id=message_id)
 
-            await asyncio.sleep(0.001)
-            assert not done.done()
-
-            connection.close()
-            assert await server.runner.ws_read(connection) is None
+                await asyncio.sleep(0.001)
+                assert not done.done()
 
         assert await done is True
 
-    async it "can modify what comes from a progress message", make_wrapper:
+    async it "can modify what comes from a progress message", make_server:
 
         class Handler(SimpleWebSocketBase):
             def transform_progress(s, body, message, **kwargs):
@@ -181,27 +141,23 @@ describe "SimpleWebSocketBase":
                 progress_cb("WAT", arg=1, do_log=False, stack_extra=1)
                 return "blah"
 
-        message_id = str(uuid.uuid1())
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
-            msg = {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
-            await server.runner.ws_write(connection, msg)
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                message_id = await stream.start("/one/two", {"hello": "there"})
 
-            res = await server.runner.ws_read(connection)
-            progress = {
-                "body": msg,
-                "message": "WAT",
-                "kwargs": {"arg": 1, "do_log": False, "stack_extra": 1},
-            }
-            assert res == {"reply": {"progress": progress}, "message_id": message_id}
+                progress = {
+                    "body": {
+                        "path": "/one/two",
+                        "body": {"hello": "there"},
+                        "message_id": message_id,
+                    },
+                    "message": "WAT",
+                    "kwargs": {"arg": 1, "do_log": False, "stack_extra": 1},
+                }
+                await stream.check_reply({"progress": progress}, message_id=message_id)
+                await stream.check_reply("blah", message_id=message_id)
 
-            res = await server.runner.ws_read(connection)
-            assert res == {"reply": "blah", "message_id": message_id}
-
-            connection.close()
-            assert await server.runner.ws_read(connection) is None
-
-    async it "can yield 0 progress messages if we so desire", make_wrapper:
+    async it "can yield 0 progress messages if we so desire", make_server:
 
         class Handler(SimpleWebSocketBase):
             def transform_progress(s, body, message, **kwargs):
@@ -215,28 +171,15 @@ describe "SimpleWebSocketBase":
                 progress_cb("there")
                 return "blah"
 
-        message_id = str(uuid.uuid1())
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
-            msg = {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
-            await server.runner.ws_write(connection, msg)
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                message_id = await stream.start("/one/two", {"hello": "there"})
 
-            async def assertProgress(expect):
-                assert await server.runner.ws_read(connection) == {
-                    "reply": {"progress": expect},
-                    "message_id": message_id,
-                }
+                await stream.check_reply({"progress": "hello"}, message_id=message_id)
+                await stream.check_reply({"progress": "there"}, message_id=message_id)
+                await stream.check_reply("blah", message_id=message_id)
 
-            await assertProgress("hello")
-            await assertProgress("there")
-
-            res = await server.runner.ws_read(connection)
-            assert res == {"reply": "blah", "message_id": message_id}
-
-            connection.close()
-            assert await server.runner.ws_read(connection) is None
-
-    async it "can yield multiple progress messages if we so desire", make_wrapper:
+    async it "can yield multiple progress messages if we so desire", make_server:
 
         class Handler(SimpleWebSocketBase):
             def transform_progress(s, body, message, **kwargs):
@@ -247,28 +190,15 @@ describe "SimpleWebSocketBase":
                 progress_cb(["hello", "people"])
                 return "blah"
 
-        message_id = str(uuid.uuid1())
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
-            msg = {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
-            await server.runner.ws_write(connection, msg)
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                message_id = await stream.start("/one/two", {"hello": "there"})
 
-            async def assertProgress(expect):
-                assert await server.runner.ws_read(connection) == {
-                    "reply": {"progress": expect},
-                    "message_id": message_id,
-                }
+                await stream.check_reply({"progress": "hello"}, message_id=message_id)
+                await stream.check_reply({"progress": "people"}, message_id=message_id)
+                await stream.check_reply("blah", message_id=message_id)
 
-            await assertProgress("hello")
-            await assertProgress("people")
-
-            res = await server.runner.ws_read(connection)
-            assert res == {"reply": "blah", "message_id": message_id}
-
-            connection.close()
-            assert await server.runner.ws_read(connection) is None
-
-    async it "calls the message_done callback", make_wrapper:
+    async it "calls the message_done callback", make_server:
         info = {"message_key": None}
         called = []
 
@@ -282,27 +212,33 @@ describe "SimpleWebSocketBase":
                 progress_cb("hello")
                 return "blah"
 
-        message_id = str(uuid.uuid1())
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
-            msg = {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
-            await server.runner.ws_write(connection, msg)
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                message_id = await stream.start("/one/two", {"hello": "there"})
 
-            assert await server.runner.ws_read(connection) == {
-                "reply": {"progress": "hello"},
-                "message_id": message_id,
-            }
+                await stream.check_reply({"progress": "hello"}, message_id=message_id)
+                await stream.check_reply("blah", message_id=message_id)
 
-            res = await server.runner.ws_read(connection)
-            assert res == {"reply": "blah", "message_id": message_id}
+                assert info["message_key"] is not None
+                pytest.helpers.assertComparison(
+                    called,
+                    [
+                        "process",
+                        (
+                            {
+                                "path": "/one/two",
+                                "body": {"hello": "there"},
+                                "message_id": message_id,
+                            },
+                            "blah",
+                            info["message_key"],
+                            None,
+                        ),
+                    ],
+                    is_json=True,
+                )
 
-            assert info["message_key"] is not None
-            assert called == ["process", (msg, "blah", info["message_key"], None)]
-
-            connection.close()
-            assert await server.runner.ws_read(connection) is None
-
-    async it "sends back done true if msg is None", make_wrapper:
+    async it "sends back done true if msg is None", make_server:
         info = {"message_key": None}
         called = []
 
@@ -316,27 +252,27 @@ describe "SimpleWebSocketBase":
                 progress_cb("hello")
 
         message_id = str(uuid.uuid1())
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
-            msg = {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
-            await server.runner.ws_write(connection, msg)
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                message_id = await stream.start("/one/two", {"hello": "there"})
 
-            assert await server.runner.ws_read(connection) == {
-                "reply": {"progress": "hello"},
-                "message_id": message_id,
-            }
+                await stream.check_reply({"progress": "hello"}, message_id=message_id)
 
-            assert len(server.wsconnections) == 0
-            assert info["message_key"] is not None
-            assert called == ["process", (msg, None, info["message_key"], None)]
+                assert len(server.wsconnections) == 0
+                assert info["message_key"] is not None
+                assert called == [
+                    "process",
+                    (
+                        {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id,},
+                        None,
+                        info["message_key"],
+                        None,
+                    ),
+                ]
 
-            connection.close()
-            assert await server.runner.ws_read(connection) == {
-                "message_id": message_id,
-                "reply": {"done": True},
-            }
+                await stream.check_reply({"done": True}, message_id=message_id)
 
-    async it "calls the message_done with exc_info if an exception is raised in process_message", make_wrapper:
+    async it "calls the message_done with exc_info if an exception is raised in process_message", make_server:
         info = {"message_key": None}
         error = ValueError("NOPE")
         called = []
@@ -352,23 +288,20 @@ describe "SimpleWebSocketBase":
                 raise error
 
         message_id = str(uuid.uuid1())
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
-            msg = {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
-            await server.runner.ws_write(connection, msg)
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                message_id = await stream.start("/one/two", {"hello": "there"})
 
-            assert await server.runner.ws_read(connection) == {
-                "reply": {"progress": "hello"},
-                "message_id": message_id,
-            }
+                await stream.check_reply({"progress": "hello"}, message_id=message_id)
 
-            res = await server.runner.ws_read(connection)
-            reply = {
-                "error": "Internal Server Error",
-                "error_code": "InternalServerError",
-                "status": 500,
-            }
-            assert res == {"reply": reply, "message_id": message_id}
+                reply = {
+                    "error": "Internal Server Error",
+                    "error_code": "InternalServerError",
+                    "status": 500,
+                }
+                await stream.check_reply(
+                    reply, message_id=message_id,
+                )
 
             assert info["message_key"] is not None
 
@@ -378,13 +311,15 @@ describe "SimpleWebSocketBase":
 
             assert called == [
                 "process",
-                (msg, reply, info["message_key"], (ValueError, error, ATraceback())),
+                (
+                    {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id},
+                    reply,
+                    info["message_key"],
+                    (ValueError, error, ATraceback()),
+                ),
             ]
 
-            connection.close()
-            assert await server.runner.ws_read(connection) is None
-
-    async it "message_done can be used to close the connection", make_wrapper:
+    async it "message_done can be used to close the connection", make_server:
         info = {"message_key": None}
         called = []
 
@@ -400,26 +335,26 @@ describe "SimpleWebSocketBase":
                 return {"one": "two"}
 
         message_id = str(uuid.uuid1())
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
-            msg = {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id}
-            await server.runner.ws_write(connection, msg)
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                message_id = await stream.start("/one/two", {"hello": "there"})
 
-            assert await server.runner.ws_read(connection) == {
-                "reply": {"progress": "there"},
-                "message_id": message_id,
-            }
+                await stream.check_reply({"progress": "there"}, message_id=message_id)
+                await stream.check_reply({"one": "two"}, message_id=message_id)
 
-            res = await server.runner.ws_read(connection)
-            assert res == {"reply": {"one": "two"}, "message_id": message_id}
+                assert info["message_key"] is not None
 
-            assert info["message_key"] is not None
+                assert called == [
+                    "process",
+                    (
+                        {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id},
+                        {"one": "two"},
+                        info["message_key"],
+                        None,
+                    ),
+                ]
 
-            assert called == ["process", (msg, {"one": "two"}, info["message_key"], None)]
-
-            assert await server.runner.ws_read(connection) is None
-
-    async it "modifies ws_connection object", make_wrapper:
+    async it "modifies ws_connection object", make_server:
 
         class Handler(SimpleWebSocketBase):
             async def process_message(s, path, body, message_id, message_key, progress_cb):
@@ -430,20 +365,12 @@ describe "SimpleWebSocketBase":
                 assert message_key in s.wsconnections
                 return "blah"
 
-        message_id = str(uuid.uuid1())
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
-            await server.runner.ws_write(
-                connection,
-                {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id},
-            )
-            await server.runner.ws_read(connection)
-            assert server.wsconnections == {}
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                await stream.start("/one/two", {"hello": "there"})
+                assert server.wsconnections == {}
 
-            connection.close()
-            assert await server.runner.ws_read(connection) is None
-
-    async it "waits for connections to close before ending server", make_wrapper:
+    async it "waits for connections to close before ending server", make_server:
         f1 = asyncio.Future()
         f2 = asyncio.Future()
 
@@ -454,21 +381,17 @@ describe "SimpleWebSocketBase":
                 f2.set_result(True)
                 return "blah"
 
-        message_id = str(uuid.uuid1())
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
-            await server.runner.ws_write(
-                connection,
-                {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id},
-            )
-            await f1
-            assert len(server.wsconnections) == 1
-            assert not f2.done()
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                await stream.start("/one/two", {"hello": "there"})
 
-        assert len(server.wsconnections) == 0
+                await f1
+                assert len(server.wsconnections) == 1
+                assert not f2.done()
+
         assert f2.result() is True
 
-    async it "can stay open", make_wrapper:
+    async it "can stay open", make_server:
         message_info = {"keys": set(), "message_keys": []}
 
         class Handler(SimpleWebSocketBase):
@@ -479,30 +402,18 @@ describe "SimpleWebSocketBase":
                 message_info["message_keys"].append(message_key)
                 return body["wat"]
 
-        message_id = str(uuid.uuid1())
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
-            await server.runner.ws_write(
-                connection, {"path": "/one/two", "body": {"wat": "one"}, "message_id": message_id},
-            )
-            res = await server.runner.ws_read(connection)
-            assert res["message_id"] == message_id
-            assert res["reply"] == "one"
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                message_id = await stream.start("/one/two", {"wat": "one"})
+                await stream.check_reply("one", message_id=message_id)
 
-            await server.runner.ws_write(
-                connection, {"path": "/one/two", "body": {"wat": "two"}, "message_id": message_id},
-            )
-            res = await server.runner.ws_read(connection)
-            assert res["message_id"] == message_id
-            assert res["reply"] == "two"
-
-            connection.close()
-            assert await server.runner.ws_read(connection) is None
+                message_id = await stream.start("/one/two", {"wat": "two"})
+                await stream.check_reply("two", message_id=message_id)
 
         assert len(message_info["keys"]) == 1
         assert len(message_info["message_keys"]) == len(set(message_info["message_keys"]))
 
-    async it "can handle ticks for me", make_wrapper:
+    async it "can handle ticks for me", make_server:
 
         class Handler(SimpleWebSocketBase):
             async def process_message(s, path, body, message_id, message_key, progress_cb):
@@ -512,24 +423,15 @@ describe "SimpleWebSocketBase":
 
         message_id = str(uuid.uuid1())
 
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
-            await server.runner.ws_write(connection, {"path": "__tick__", "message_id": "__tick__"})
-            res = await server.runner.ws_read(connection)
-            assert res["message_id"] == "__tick__"
-            assert res["reply"] == {"ok": "thankyou"}
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                await stream.start("__tick__", pytest.helpers.Empty, message_id="__tick__")
+                await stream.check_reply({"ok": "thankyou"}, message_id="__tick__")
 
-            await server.runner.ws_write(
-                connection, {"path": "/one/two", "body": {"wat": "two"}, "message_id": message_id},
-            )
-            res = await server.runner.ws_read(connection)
-            assert res["message_id"] == message_id
-            assert res["reply"] == "two"
+                message_id = await stream.start("/one/two", {"wat": "two"})
+                await stream.check_reply("two", message_id=message_id)
 
-            connection.close()
-            assert await server.runner.ws_read(connection) is None
-
-    async it "complains if the message is incorrect", make_wrapper:
+    async it "complains if the message is incorrect", make_server:
 
         class Handler(SimpleWebSocketBase):
             async def process_message(s, path, body, message_id, message_key, progress_cb):
@@ -551,21 +453,21 @@ describe "SimpleWebSocketBase":
             [1],
         ]
 
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                for body in invalid:
+                    await stream.ws.send_json(body)
+                    res = await stream.ws.receive_json()
+                    pytest.helpers.assertComparison(
+                        res,
+                        {
+                            "message_id": None,
+                            "reply": {"error": mock.ANY, "error_code": "InvalidMessage"},
+                        },
+                        is_json=True,
+                    )
 
-            for body in invalid:
-                await server.runner.ws_write(connection, body)
-                res = await server.runner.ws_read(connection)
-                assert res is not None, "Got no reply to : '{}'".format(body)
-                assert res["message_id"] is None
-                assert "reply" in res
-                assert "error" in res["reply"]
-
-            connection.close()
-            assert await server.runner.ws_read(connection) is None
-
-    async it "can do multiple messages at the same time", make_wrapper:
+    async it "can do multiple messages at the same time", make_server:
 
         class Handler(SimpleWebSocketBase):
             do_close = False
@@ -575,46 +477,49 @@ describe "SimpleWebSocketBase":
                 await asyncio.sleep(body["sleep"])
                 return {"processed": body["serial"]}
 
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
 
-            msg_id1 = str(uuid.uuid1())
-            msg_id2 = str(uuid.uuid1())
+                message_id1 = str(uuid.uuid1())
+                message_id2 = str(uuid.uuid1())
 
-            await server.runner.ws_write(
-                connection,
-                {"path": "/process", "body": {"serial": "1", "sleep": 0.1}, "message_id": msg_id1,},
-            )
-            await server.runner.ws_write(
-                connection,
-                {
-                    "path": "/process",
-                    "body": {"serial": "2", "sleep": 0.05},
-                    "message_id": msg_id2,
-                },
-            )
+                await stream.ws.send_json(
+                    {
+                        "path": "/process",
+                        "body": {"serial": "1", "sleep": 0.1},
+                        "message_id": message_id1,
+                    },
+                )
+                await stream.ws.send_json(
+                    {
+                        "path": "/process",
+                        "body": {"serial": "2", "sleep": 0.05},
+                        "message_id": message_id2,
+                    },
+                )
 
-            assert await server.runner.ws_read(connection) == {
-                "message_id": msg_id1,
-                "reply": {"progress": {"1": ["info", "start"]}},
-            }
-            assert await server.runner.ws_read(connection) == {
-                "message_id": msg_id2,
-                "reply": {"progress": {"2": ["info", "start"]}},
-            }
-            assert await server.runner.ws_read(connection) == {
-                "message_id": msg_id2,
-                "reply": {"processed": "2"},
-            }
-            assert await server.runner.ws_read(connection) == {
-                "message_id": msg_id1,
-                "reply": {"processed": "1"},
-            }
+                pytest.helpers.assertComparison(
+                    await stream.ws.receive_json(),
+                    {"message_id": message_id1, "reply": {"progress": {"1": ["info", "start"]}}},
+                    is_json=True,
+                )
+                pytest.helpers.assertComparison(
+                    await stream.ws.receive_json(),
+                    {"message_id": message_id2, "reply": {"progress": {"2": ["info", "start"]}}},
+                    is_json=True,
+                )
+                pytest.helpers.assertComparison(
+                    await stream.ws.receive_json(),
+                    {"message_id": message_id2, "reply": {"processed": "2"}},
+                    is_json=True,
+                )
+                pytest.helpers.assertComparison(
+                    await stream.ws.receive_json(),
+                    {"message_id": message_id1, "reply": {"processed": "1"}},
+                    is_json=True,
+                )
 
-            connection.close()
-            assert await server.runner.ws_read(connection) is None
-
-    async it "can close the websocket if we return self.Closing", make_wrapper:
+    async it "can close the websocket if we return self.Closing", make_server:
 
         class Handler(SimpleWebSocketBase):
             async def process_message(s, path, body, message_id, message_key, progress_cb):
@@ -623,67 +528,63 @@ describe "SimpleWebSocketBase":
                 else:
                     return "stillalive"
 
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
 
-            msg_id = str(uuid.uuid1())
-            await server.runner.ws_write(
-                connection, {"path": "/process", "body": {"close": False}, "message_id": msg_id}
-            )
-            assert await server.runner.ws_read(connection) == {
-                "message_id": msg_id,
-                "reply": "stillalive",
-            }
+                message_id = str(uuid.uuid1())
+                await stream.ws.send_json(
+                    {"path": "/process", "body": {"close": False}, "message_id": message_id}
+                )
+                pytest.helpers.assertComparison(
+                    await stream.ws.receive_json(),
+                    {"message_id": message_id, "reply": "stillalive",},
+                    is_json=True,
+                )
 
-            msg_id = str(uuid.uuid1())
-            await server.runner.ws_write(
-                connection, {"path": "/process", "body": {"close": False}, "message_id": msg_id}
-            )
-            assert await server.runner.ws_read(connection) == {
-                "message_id": msg_id,
-                "reply": "stillalive",
-            }
+                message_id = str(uuid.uuid1())
+                await stream.ws.send_json(
+                    {"path": "/process", "body": {"close": False}, "message_id": message_id}
+                )
+                pytest.helpers.assertComparison(
+                    await stream.ws.receive_json(),
+                    {"message_id": message_id, "reply": "stillalive"},
+                    is_json=True,
+                )
 
-            msg_id = str(uuid.uuid1())
-            await server.runner.ws_write(
-                connection, {"path": "/process", "body": {"close": True}, "message_id": msg_id}
-            )
-            assert await server.runner.ws_read(connection) == {
-                "message_id": msg_id,
-                "reply": {"closing": "goodbye"},
-            }
+                message_id = str(uuid.uuid1())
+                await stream.ws.send_json(
+                    {"path": "/process", "body": {"close": True}, "message_id": message_id}
+                )
+                pytest.helpers.assertComparison(
+                    await stream.ws.receive_json(),
+                    {"message_id": message_id, "reply": {"closing": "goodbye"}},
+                    is_json=True,
+                )
 
-            assert await server.runner.ws_read(connection) is None
+                await stream.ws.receive() is None
 
-    async it "can handle arbitrary json for the body", make_wrapper:
+    async it "can handle arbitrary json for the body", make_server:
 
         class Handler(SimpleWebSocketBase):
             async def process_message(s, path, body, message_id, message_key, progress_cb):
                 return body
 
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                body = {
+                    "one": "two",
+                    "three": 4,
+                    "five": ["six", "seven", []],
+                    "six": [],
+                    "seven": True,
+                    "eight": False,
+                    "nine": {"one": "two", "three": None, "four": {"five": "six"}},
+                }
 
-            msg_id = str(uuid.uuid1())
-            body = {
-                "one": "two",
-                "three": 4,
-                "five": ["six", "seven", []],
-                "six": [],
-                "seven": True,
-                "eight": False,
-                "nine": {"one": "two", "three": None, "four": {"five": "six"}},
-            }
+                message_id = await stream.start("/process", body)
+                await stream.check_reply(body, message_id=message_id)
 
-            await server.runner.ws_write(
-                connection, {"path": "/process", "body": body, "message_id": msg_id}
-            )
-            assert await server.runner.ws_read(connection) == {"message_id": msg_id, "reply": body}
-            connection.close()
-
-            assert await server.runner.ws_read(connection) is None
-
-    async it "can handle exceptions in process_message", make_wrapper:
+    async it "can handle exceptions in process_message", make_server:
 
         class BadError(Exception):
             def as_dict(ss):
@@ -706,35 +607,26 @@ describe "SimpleWebSocketBase":
             async def process_message(s, path, body, message_id, message_key, progress_cb):
                 raise errors[body["error"]]
 
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                message_id = await stream.start("/error", {"error": "one"})
 
-            msg_id = str(uuid.uuid1())
-            await server.runner.ws_write(
-                connection, {"path": "/error", "body": {"error": "one"}, "message_id": msg_id}
-            )
-            assert await server.runner.ws_read(connection) == {
-                "message_id": msg_id,
-                "reply": {
-                    "error": "Internal Server Error",
-                    "error_code": "InternalServerError",
-                    "status": 500,
-                },
-            }
+                await stream.check_reply(
+                    {
+                        "error": "Internal Server Error",
+                        "error_code": "InternalServerError",
+                        "status": 500,
+                    },
+                    message_id=message_id,
+                )
 
-            msg_id2 = str(uuid.uuid1())
-            await server.runner.ws_write(
-                connection, {"path": "/error", "body": {"error": "two"}, "message_id": msg_id2}
-            )
-            assert await server.runner.ws_read(connection) == {
-                "message_id": msg_id2,
-                "reply": {"error": {"error": "Try again"}, "error_code": "BadError"},
-            }
+                message_id2 = await stream.start("/error", {"error": "two"})
+                await stream.check_reply(
+                    {"error": {"error": "Try again"}, "error_code": "BadError"},
+                    message_id=message_id2,
+                )
 
-            connection.close()
-            assert await server.runner.ws_read(connection) is None
-
-    async it "can handle a return that has as_dict on it", make_wrapper:
+    async it "can handle a return that has as_dict on it", make_server:
 
         class Ret:
             def __init__(s, value):
@@ -747,22 +639,14 @@ describe "SimpleWebSocketBase":
             async def process_message(s, path, body, message_id, message_key, progress_cb):
                 return Ret("blah and stuff")
 
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
+                message_id = await stream.start("/thing", {})
+                await stream.check_reply(
+                    {"result": "", "value": "blah and stuff"}, message_id=message_id
+                )
 
-            msg_id = str(uuid.uuid1())
-            await server.runner.ws_write(
-                connection, {"path": "/thing", "body": {}, "message_id": msg_id}
-            )
-            assert await server.runner.ws_read(connection) == {
-                "message_id": msg_id,
-                "reply": {"result": "", "value": "blah and stuff"},
-            }
-
-            connection.close()
-            assert await server.runner.ws_read(connection) is None
-
-    async it "can process replies", make_wrapper:
+    async it "can process replies", make_server:
         replies = []
 
         error1 = ValueError("Bad things happen")
@@ -790,67 +674,49 @@ describe "SimpleWebSocketBase":
 
                     return Ret()
 
-        async with make_wrapper(Handler) as server:
-            connection = await server.runner.ws_connect()
+        async with make_server(Handler) as server:
+            async with server.ws_stream() as stream:
 
-            ##################
-            ### NO_ERROR
+                ##################
+                ### NO_ERROR
 
-            msg_id = str(uuid.uuid1())
-            await server.runner.ws_write(
-                connection, {"path": "/no_error", "body": {}, "message_id": msg_id}
-            )
-            assert await server.runner.ws_read(connection) == {
-                "message_id": msg_id,
-                "reply": {"success": True},
-            }
+                message_id = await stream.start("/no_error", {})
+                await stream.check_reply({"success": True}, message_id=message_id)
 
-            ##################
-            ### INTERNAL_ERROR
+                ##################
+                ### INTERNAL_ERROR
 
-            msg_id = str(uuid.uuid1())
-            await server.runner.ws_write(
-                connection, {"path": "/internal_error", "body": {}, "message_id": msg_id}
-            )
-            assert await server.runner.ws_read(connection) == {
-                "message_id": msg_id,
-                "reply": {
-                    "error": "Internal Server Error",
-                    "error_code": "InternalServerError",
-                    "status": 500,
-                },
-            }
+                message_id = await stream.start("/internal_error", {})
+                await stream.check_reply(
+                    {
+                        "error": "Internal Server Error",
+                        "error_code": "InternalServerError",
+                        "status": 500,
+                    },
+                    message_id=message_id,
+                )
 
-            ##################
-            ### CUSTOM RETURN
+                ##################
+                ### CUSTOM RETURN
 
-            msg_id = str(uuid.uuid1())
-            await server.runner.ws_write(
-                connection, {"path": "/custom_return", "body": {}, "message_id": msg_id}
-            )
-            assert await server.runner.ws_read(connection) == {
-                "message_id": msg_id,
-                "reply": {"progress": {"error": "progress"}},
-            }
-            assert await server.runner.ws_read(connection) == {
-                "message_id": msg_id,
-                "reply": {"error": "Stuff", "status": 400},
-            }
+                message_id = await stream.start("/custom_return", {})
+                await stream.check_reply({"progress": {"error": "progress"}}, message_id=message_id)
+                await stream.check_reply({"error": "Stuff", "status": 400}, message_id=message_id)
 
-        class ATraceback:
-            def __eq__(s, other):
-                return isinstance(other, types.TracebackType)
+            class ATraceback:
+                def __eq__(s, other):
+                    return isinstance(other, types.TracebackType)
 
-        assert replies == [
-            ({"success": True}, None),
-            (
-                {
-                    "status": 500,
-                    "error": "Internal Server Error",
-                    "error_code": "InternalServerError",
-                },
-                (ValueError, error1, ATraceback()),
-            ),
-            ({"progress": {"error": "progress"}}, None),
-            ({"error": "Stuff", "status": 400}, (Finished, error2, None)),
-        ]
+            assert replies == [
+                ({"success": True}, None),
+                (
+                    {
+                        "status": 500,
+                        "error": "Internal Server Error",
+                        "error_code": "InternalServerError",
+                    },
+                    (ValueError, error1, ATraceback()),
+                ),
+                ({"progress": {"error": "progress"}}, None),
+                ({"error": "Stuff", "status": 400}, (Finished, error2, None)),
+            ]

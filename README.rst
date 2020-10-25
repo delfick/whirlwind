@@ -6,6 +6,12 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
+0.10.0 - TBD
+    * Removed whirlwind.test_helpers
+
+      * It was random and didn't work well in an async context
+      * Used asynctest which has warnings past python3.7 and isn't necessary anymore
+
 0.9.0 - 10 May 2020
     * The SimpleWebSocketBase and WSHandler handlers now take in a
       ``final_future`` which is used to stop the websocket stream when it is
@@ -66,7 +72,7 @@ Installation
 This package is released to pypi under the name ``whirlwind-web``. When you add
 this package to your setup.py it is recommended you either specify ``[peer]`` as
 well or pin ``input_algorithms``, ``option_merge`` and ``tornado`` to particular
-versions.  See https://github.com/delfick/whirlwind/blob/master/setup.py#L24-L28
+versions.  See https://github.com/delfick/whirlwind/blob/main/setup.py#L24-L28
 for the recommended versions.
 
 For example:
