@@ -6,7 +6,7 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
-0.10.0 - TBD
+0.10.0 - 25 October 2020
     * Removed whirlwind.test_helpers
 
       * It was random and didn't work well in an async context
