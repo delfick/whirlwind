@@ -18,7 +18,7 @@ setup(
 
     , extras_require =
       { "tests":
-        [ "noseOfYeti==2.0.1"
+        [ "noseOfYeti==2.0.2"
         , "mock==4.0.2"
         , "pytest==5.3.1"
         , "aiohttp==3.7.0"
