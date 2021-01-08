@@ -41,7 +41,7 @@ def _port_connected(port):
         return True
 
     error = errno.errorcode[res]
-    assert res is errno.ECONNREFUSED, (error, port)
+    assert res == errno.ECONNREFUSED, (error, port)
     return False
 
 
