@@ -422,7 +422,13 @@ describe "command_spec":
 
         final_future = asyncio.Future()
         message_id = str(uuid.uuid1())
-        meta = Meta({"message_id": message_id, "final_future": final_future,}, [])
+        meta = Meta(
+            {
+                "message_id": message_id,
+                "final_future": final_future,
+            },
+            [],
+        )
 
         with assertRaises(
             BadSpecValue,
@@ -431,9 +437,7 @@ describe "command_spec":
             wanted="nonexistant",
             meta=meta.at("body").at("command"),
         ):
-            store.command_spec.normalise(
-                meta, {"path": "/v1", "body": {"command": "nonexistant"}},
-            )
+            store.command_spec.normalise(meta, {"path": "/v1", "body": {"command": "nonexistant"}})
 
         with assertRaises(
             BadSpecValue,
@@ -443,7 +447,7 @@ describe "command_spec":
             meta=meta.at("body").at("command"),
         ):
             store.command_spec.normalise(
-                meta, {"path": "/v1", "body": {"command": "nonexistant"}, "allow_ws_only": True},
+                meta, {"path": "/v1", "body": {"command": "nonexistant"}, "allow_ws_only": True}
             )
 
         with assertRaises(
@@ -452,9 +456,7 @@ describe "command_spec":
             available=["command2", "command3"],
             meta=meta.at("body").at("command"),
         ):
-            store.command_spec.normalise(
-                meta, {"path": "/v1", "body": {"command": "interactive"}},
-            )
+            store.command_spec.normalise(meta, {"path": "/v1", "body": {"command": "interactive"}})
 
     async it "allows children commands":
         store = Store(default_path="/v1", formatter=MergedOptionStringFormatter)

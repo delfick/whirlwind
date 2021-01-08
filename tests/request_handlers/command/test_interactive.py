@@ -316,7 +316,8 @@ describe "Interactive commands":
                 message_id=[message_id, sub_message_id],
             )
             await stream.check_reply(
-                {"progress": {"info": "started"}}, message_id=[message_id, sub_message_id],
+                {"progress": {"info": "started"}},
+                message_id=[message_id, sub_message_id],
             )
 
             sub_child_message_id = str(uuid.uuid1())
@@ -327,7 +328,8 @@ describe "Interactive commands":
             )
 
             await stream.check_reply(
-                {"child1": True}, message_id=[message_id, sub_message_id, sub_child_message_id],
+                {"child1": True},
+                message_id=[message_id, sub_message_id, sub_child_message_id],
             )
             await stream.check_reply(
                 {"progress": {"sub": {"child1": True}}}, message_id=[message_id, sub_message_id]
@@ -341,7 +343,8 @@ describe "Interactive commands":
             )
 
             await stream.check_reply(
-                {"stop": True}, message_id=[message_id, sub_message_id, sub_child_message_id],
+                {"stop": True},
+                message_id=[message_id, sub_message_id, sub_child_message_id],
             )
             await stream.check_reply(
                 {"progress": {"sub": {"stop": True}}}, message_id=[message_id, sub_message_id]

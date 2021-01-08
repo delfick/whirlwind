@@ -182,7 +182,7 @@ describe "Commander":
         commander = Commander(store2)
 
         with assertRaises(
-            BadOptionFormat, "Can't find key in options", chain=["body.args.option"], key="option",
+            BadOptionFormat, "Can't find key in options", chain=["body.args.option"], key="option"
         ):
             await commander.executor(progress_cb, request_handler).execute(
                 "/v1", {"command": "injected_can_have_format_into", "args": {"option": "asdf"}}

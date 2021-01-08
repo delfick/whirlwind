@@ -263,7 +263,11 @@ describe "SimpleWebSocketBase":
                 assert called == [
                     "process",
                     (
-                        {"path": "/one/two", "body": {"hello": "there"}, "message_id": message_id,},
+                        {
+                            "path": "/one/two",
+                            "body": {"hello": "there"},
+                            "message_id": message_id,
+                        },
                         None,
                         info["message_key"],
                         None,
@@ -300,7 +304,8 @@ describe "SimpleWebSocketBase":
                     "status": 500,
                 }
                 await stream.check_reply(
-                    reply, message_id=message_id,
+                    reply,
+                    message_id=message_id,
                 )
 
             assert info["message_key"] is not None
@@ -537,7 +542,10 @@ describe "SimpleWebSocketBase":
                 )
                 pytest.helpers.assertComparison(
                     await stream.ws.receive_json(),
-                    {"message_id": message_id, "reply": "stillalive",},
+                    {
+                        "message_id": message_id,
+                        "reply": "stillalive",
+                    },
                     is_json=True,
                 )
 
