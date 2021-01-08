@@ -8,6 +8,9 @@ Changlog
 
 0.10.1 - TBD
     * Removed the wait_for_futures helper. It's not a great implementation.
+    * The server now uses ``await self.wait_for_end()`` to wait till we should
+      shut down the server. By default this does ``await self.final_future`` like it
+      already was doing.
 
 0.10.0 - 25 October 2020
     * Removed whirlwind.test_helpers

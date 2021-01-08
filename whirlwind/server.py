@@ -24,7 +24,7 @@ class Server(object):
 
         http_server.listen(port, host)
         try:
-            await self.final_future
+            await self.wait_for_end()
         except ForcedQuit:
             log.info("The server was told to shut down")
         finally:
@@ -32,6 +32,10 @@ class Server(object):
                 http_server.stop()
             finally:
                 await self.cleanup()
+
+    async def wait_for_end(self):
+        """Hook that will end when we need to stop the server"""
+        await self.final_future
 
     async def setup(self, *args, **kwargs):
         """
