@@ -17,8 +17,8 @@ An example in code:
 .. code-block:: python
 
   from whirlwind.request_handlers.command import CommandHandler, WSHandler
-  from whirlwind.server import Server, wait_for_futures
   from whirlwind.commander import Commander
+  from whirlwind.server import Server
   from whirlwind.store import Store
 
   from option_merge.formatter import MergedOptionStringFormatter
@@ -90,7 +90,9 @@ An example in code:
               )
 
       async def cleanup(self):
-          await wait_for_futures(self.wsconnections)
+          ts = list(self.wsconnections.values())
+          if ts:
+              await asyncio.wait(ts)
 
       def tornado_routes(self):
           return [

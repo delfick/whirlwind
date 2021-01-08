@@ -1,7 +1,6 @@
 from tornado.httpserver import HTTPServer
 import tornado.web
 import logging
-import asyncio
 
 log = logging.getLogger("whirlwind.server")
 
@@ -50,14 +49,3 @@ class Server(object):
 
     async def cleanup(self):
         """Called after the server has stopped"""
-
-
-async def wait_for_futures(futures):
-    """
-    Helper for waiting on futures in a dictionary of {key: future}
-
-    Useful for waiting on the wsconnections object given to a WSHandler
-    """
-    ts = list(futures.values())
-    if ts:
-        await asyncio.wait(ts)

@@ -6,6 +6,9 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
+0.10.1 - TBD
+    * Removed the wait_for_futures helper. It's not a great implementation.
+
 0.10.0 - 25 October 2020
     * Removed whirlwind.test_helpers
 

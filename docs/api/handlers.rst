@@ -158,7 +158,7 @@ create a websocket handler. For example:
 .. code-block:: python
 
   from whirlwind.request_handlers.base import SimpleWebSocketBase
-  from whirlwind.server import wait_for_futures, Server
+  from whirlwind.server import Server
 
   import time
 
@@ -181,7 +181,9 @@ create a websocket handler. For example:
 
       async def cleanup(self):
           # Wait for our websockets to finish
-          await wait_for_futures(self.wsconnections)
+          ts = list(self.wsconnections.values())
+          if ts:
+              await asyncio.wait(ts)
 
   # Opening the websocket stream to /ws will get us back this message
   # {"reply": <the server_time>, "message_id": "__server_time__"}
@@ -210,10 +212,11 @@ server_time as None then it won't send this message.
 
 The ``wsconnections`` object is used to store the asyncio tasks that are created
 for each websocket message that is received. It is up to you to wait on these
-tasks when the server is finished to ensure they finish cleanly. The ``wait_for_futures``
-helper does just this, as shown in the example. The handler will create a unique
-uuid for every message it receives and use that as the key in ``wsconnections``.
-This unique uuid is passed into ``process_message`` as ``message_key``.
+tasks when the server is finished to ensure they finish cleanly.
+
+The handler will create a unique uuid for every message it receives and use that
+as the key in ``wsconnections``.  This unique uuid is passed into ``process_message``
+as ``message_key``.
 
 The other thing that this handler will do for you is handle any message of the
 form ``{"path": "__tick__", "message_id": "__tick__"}`` with the reply of
