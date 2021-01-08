@@ -8,7 +8,7 @@ Changlog
 
 .. _release-0-10-1:
 
-0.10.1 - TBD
+0.10.1 - 8 January 2021
     * Removed the wait_for_futures helper. It's not a great implementation.
     * The server now uses ``await self.wait_for_end()`` to wait till we should
       shut down the server. By default this does ``await self.final_future`` like it
