@@ -14,28 +14,42 @@ class Server(object):
         self.final_future = final_future
 
     async def serve(self, host, port, *args, **kwargs):
-        server_kwargs = await self.setup(*args, **kwargs)
-        if server_kwargs is None:
-            server_kwargs = {}
+        self.port = port
+        self.host = host
+        self.server_kwargs = await self.setup(*args, **kwargs)
+        if self.server_kwargs is None:
+            self.server_kwargs = {}
 
-        http_server = HTTPServer(tornado.web.Application(self.tornado_routes(), **server_kwargs))
+        self.routes = self.tornado_routes()
+        self.http_server = self.make_http_server(self.routes, self.server_kwargs)
+        self.announce_start()
 
-        log.info(f"Hosting server at http://{host}:{port}")
-
-        http_server.listen(port, host)
+        self.http_server.listen(self.port, self.host)
         try:
             await self.wait_for_end()
         except ForcedQuit:
             log.info("The server was told to shut down")
         finally:
             try:
-                http_server.stop()
+                self.http_server.stop()
             finally:
                 await self.cleanup()
 
     async def wait_for_end(self):
         """Hook that will end when we need to stop the server"""
         await self.final_future
+
+    def make_http_server(self, routes, server_kwargs):
+        """
+        Used to make the http server itself
+
+        We expect it at least has ``listen(port, host)`` and ``stop()``
+        """
+        return HTTPServer(tornado.web.Application(self.tornado_routes(), **server_kwargs))
+
+    def announce_start(self):
+        """Called after the server has been created and just before it is started"""
+        log.info(f"Hosting server at http://{self.host}:{self.port}")
 
     async def setup(self, *args, **kwargs):
         """
