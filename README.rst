@@ -6,6 +6,16 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
+.. _release-0-11-0:
+
+0.11.0 - TBD
+    * Added ``server_end_future`` to the Server object
+    * Added ``announce_start`` and ``make_http_server`` hooks to Server
+    * The http server and routes we make is now put onto the server object in
+      ``serve``
+    * The default error catcher will return a "RequestCancelled" error if the
+      request raises ``asyncio.CancelledError``
+
 .. _release-0-10-1:
 
 0.10.1 - 8 January 2021
