@@ -4,6 +4,7 @@ from whirlwind.request_handlers.base import AsyncCatcher, Finished, MessageFromE
 
 from unittest import mock
 import binascii
+import asyncio
 import pytest
 import types
 import uuid
@@ -80,6 +81,14 @@ describe "MessageFromExc":
             "status": 500,
             "error": "Internal Server Error",
             "error_code": "InternalServerError",
+        }
+
+    it "creates a cancelled response from cancelled":
+        info = MessageFromExc()(asyncio.CancelledError, asyncio.CancelledError(), None)
+        assert info == {
+            "status": 500,
+            "error": "Request was cancelled",
+            "error_code": "RequestCancelled",
         }
 
 describe "AsyncCatcher":

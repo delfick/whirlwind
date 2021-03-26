@@ -38,14 +38,21 @@ class MessageFromExc:
             return self.process(exc_type, exc, tb)
 
     def process(self, exc_type, exc, tb):
-        if self.log_exceptions:
-            log.error(exc, exc_info=(exc_type, exc, tb))
+        if exc_type is asyncio.CancelledError:
+            return {
+                "status": 500,
+                "error": "Request was cancelled",
+                "error_code": "RequestCancelled",
+            }
+        else:
+            if self.log_exceptions:
+                log.error(exc, exc_info=(exc_type, exc, tb))
 
-        return {
-            "status": 500,
-            "error": "Internal Server Error",
-            "error_code": "InternalServerError",
-        }
+            return {
+                "status": 500,
+                "error": "Internal Server Error",
+                "error_code": "InternalServerError",
+            }
 
 
 class AsyncCatcher(object):
