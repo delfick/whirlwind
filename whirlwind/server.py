@@ -10,8 +10,11 @@ class ForcedQuit(Exception):
 
 
 class Server(object):
-    def __init__(self, final_future):
+    def __init__(self, final_future, *, server_end_future=None):
         self.final_future = final_future
+        if server_end_future is None:
+            server_end_future = final_future
+        self.server_end_future = server_end_future
 
     async def serve(self, host, port, *args, **kwargs):
         self.port = port
@@ -37,7 +40,7 @@ class Server(object):
 
     async def wait_for_end(self):
         """Hook that will end when we need to stop the server"""
-        await self.final_future
+        await self.server_end_future
 
     def make_http_server(self, routes, server_kwargs):
         """
