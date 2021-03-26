@@ -8,7 +8,7 @@ Changlog
 
 .. _release-0-11-0:
 
-0.11.0 - TBD
+0.11.0 - 26 March 2021
     * Added ``server_end_future`` to the Server object
     * Added ``announce_start`` and ``make_http_server`` hooks to Server
     * The http server and routes we make is now put onto the server object in
