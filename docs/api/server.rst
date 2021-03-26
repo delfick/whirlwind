@@ -36,6 +36,37 @@ under the path ``/static``. It will keep serving until our ``final_future`` is
 finished. Note that in our example above, that never happens. In a real
 application you would manage the final_future so say it cancels on a SigTERM.
 
+Server end future
+-----------------
+
+The ``final_future`` you provide the server is a future that is to be resolved when your
+program has ended. Whirlwind will use this to know that it should stop the server.
+
+However, it can be nice to end the server before the entire program, and so you can
+define a separate future that is used instead.
+
+.. code-block:: python
+
+  final_future = asyncio.Future()
+  server_end_future = asyncio.Future()
+
+  # The server will end when server_end_future is finished instead of final_future
+  server = MyServer(final_future, server_end_future=server_end_future)
+
+Alternatively you may implement the ``wait_till_end`` method which returns when you
+want the server to shutdown.
+
+.. code-block:: python
+
+  from whirlwind.server import Server
+  import asyncio
+
+
+  class ServerThatStopsAfterAMinute(Server):
+      async def wait_till_end(self):
+          # By default it's, ``await self.server_end_future``
+          await asyncio.sleep(60)
+
 Extra setup
 -----------
 
@@ -48,9 +79,11 @@ stopped.
 
   from my_application import MyRouteHandler, Thing
 
+  from tornado.httpserver import HTTPServer
   from whirlwind.server import Server
-
+  import tornado.web
   import asyncio
+
 
   class MyServer(Server):
       async def setup(self, argument1, argument2):
@@ -86,11 +119,28 @@ We create the web server by saying:
 .. code-block:: python
 
     async def serve(self, host, port, *args, **kwargs):
-        server_kwargs = await self.setup(*args, **kwargs)
-        if server_kwargs is None:
-            server_kwargs = {}
+        self.server_kwargs = await self.setup(*args, **kwargs)
+        if self.server_kwargs is None:
+            self.server_kwargs = {}
 
-        http_server = HTTPServer(tornado.web.Application(self.tornado_routes(), **server_kwargs))
+        self.routes = self.tornado_routes()
+        self.http_server = self.make_http_server(self.routes, self.server_kwargs)
+
+        ...
+
+    def make_http_server(self, routes, server_kwargs):
+        """
+        Used to make the http server itself
+ 
+        takes in the result of calling ``tornado_routes()`` and the result of ``setup()``
+        """
+        # Defaults to a HTTPSServer
+        return HTTPServer(tornado.web.Application(self.tornado_routes(), **server_kwargs))
+
+    def announce_start(self):
+        """Called after the server has been created and just before it is started"""
+        # Defaults to a simple log statement
+        log.info(f"Hosting server at http://{self.host}:{self.port}")
 
 This means if you have extra arguments to provide to the Application then you
 can just return them from the setup function. For example if I wanted to setup
