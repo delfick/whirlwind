@@ -6,6 +6,11 @@ A wrapper around the tornado web server.
 Changlog
 --------
 
+.. _release-0-12-0:
+
+0.12.0 - TBD
+    * Add a new ``make_application`` hook to the Server for changing the WSGI app
+
 .. _release-0-11-0:
 
 0.11.0 - 26 March 2021

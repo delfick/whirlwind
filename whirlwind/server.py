@@ -48,7 +48,11 @@ class Server(object):
 
         We expect it at least has ``listen(port, host)`` and ``stop()``
         """
-        return HTTPServer(tornado.web.Application(self.tornado_routes(), **server_kwargs))
+        return HTTPServer(self.make_application(routes, server_kwargs))
+
+    def make_application(self, routes, server_kwargs):
+        """The WSGI application we are starting"""
+        return tornado.web.Application(routes, **server_kwargs)
 
     def announce_start(self):
         """Called after the server has been created and just before it is started"""
