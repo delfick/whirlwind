@@ -27,6 +27,9 @@ class Commander:
     def process_reply(self, msg, exc_info):
         """Hook for every reply and progress message sent to the client"""
 
+    def peek_valid_request(self, meta, command, path, body):
+        """Hook for looking at every request"""
+
     def executor(self, progress_cb, request_handler, **extra_options):
         return Executor(self, progress_cb, request_handler, extra_options)
 
@@ -85,6 +88,7 @@ class Executor:
                     "store": self.commander.store,
                     "executor": self,
                     "progress_cb": self.progress_cb,
+                    "allow_ws_only": allow_ws_only,
                     "request_future": request_future,
                     "request_handler": self.request_handler,
                 },
@@ -98,6 +102,7 @@ class Executor:
                 meta, {"path": path, "body": body, "allow_ws_only": allow_ws_only}
             )
 
+            self.commander.peek_valid_request(meta, execute.__whirlwind_command__, path, body)
             return await execute()
         finally:
             if not provided:

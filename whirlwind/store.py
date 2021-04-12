@@ -323,6 +323,7 @@ class command_spec(sb.Spec):
                 if message_id_tuple in self.existing_commands:
                     del self.existing_commands[message_id_tuple]
 
+        execute.__whirlwind_command__ = command
         return execute
 
     async def execute_interactive(self, request_future, parent_existing, existing, command):

@@ -92,6 +92,41 @@ describe "Commander":
 
         assert thing.request_future.done()
 
+    async it "sees each request":
+        other = mock.Mock(name="other")
+        progress_cb = mock.Mock(name="progress_cb")
+        request_handler = mock.Mock(name="request_handler")
+
+        info = {"processed": False}
+
+        class C(Commander):
+            def peek_valid_request(s, meta, command, path, body):
+                assert isinstance(command, Thing)
+                assert path == "/v1"
+                assert body == {"command": "thing", "args": {"value": value}}
+                assert meta.everything["request_handler"] is request_handler
+                info["processed"] = True
+
+        commander = C(store, other=other)
+
+        value = str(uuid.uuid1())
+        thing, val = await commander.executor(progress_cb, request_handler).execute(
+            "/v1", {"command": "thing", "args": {"value": value}}
+        )
+
+        assert val == value
+
+        assert thing.other is other
+        assert thing.commander is commander
+        assert thing.progress_cb is progress_cb
+        assert thing.request_handler is request_handler
+        assert thing.path == "/v1"
+        assert thing.store is store
+
+        assert thing.request_future.done()
+
+        assert info["processed"]
+
     async it "can be given a specific request future":
         other = mock.Mock(name="other")
         progress_cb = mock.Mock(name="progress_cb")
