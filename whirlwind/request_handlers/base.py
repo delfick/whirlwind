@@ -28,7 +28,8 @@ def reprer(o):
 
 
 class MessageFromExc:
-    def __init__(self, *, log_exceptions=True):
+    def __init__(self, *, log_exceptions=True, see_exception=None):
+        self.see_exception = see_exception
         self.log_exceptions = log_exceptions
 
     def __call__(self, exc_type, exc, tb):
@@ -38,6 +39,9 @@ class MessageFromExc:
             return self.process(exc_type, exc, tb)
 
     def process(self, exc_type, exc, tb):
+        if self.see_exception:
+            self.see_exception(exc_type, exc, tb)
+
         if exc_type is asyncio.CancelledError:
             return {
                 "status": 500,
@@ -45,7 +49,7 @@ class MessageFromExc:
                 "error_code": "RequestCancelled",
             }
         else:
-            if self.log_exceptions:
+            if self.see_exception is None and self.log_exceptions:
                 log.error(exc, exc_info=(exc_type, exc, tb))
 
             return {
@@ -132,9 +136,14 @@ class RequestsMixin:
     def message_from_exc(self):
         if not hasattr(self, "_message_from_exc"):
             self._message_from_exc = MessageFromExc(
-                log_exceptions=getattr(self, "log_exceptions", True)
+                see_exception=self.see_returned_exception,
+                log_exceptions=getattr(self, "log_exceptions", True),
             )
         return self._message_from_exc
+
+    def see_returned_exception(self, exc_typ, exc, tb):
+        if getattr(self, "log_exceptions", True):
+            log.error(exc, exc_info=(exc_typ, exc, tb))
 
     @message_from_exc.setter
     def message_from_exc(self, value):
@@ -160,10 +169,16 @@ class RequestsMixin:
             if type(body) is str:
                 body = json.loads(body)
         except (TypeError, ValueError) as error:
-            log.error("Failed to load body as json\t%s", body)
+            self.log_json_error(body, error)
             raise Finished(status=400, reason="Failed to load body as json", error=error)
 
         return body
+
+    def log_json_error(self, body, error):
+        """
+        Do any logging for errors parsing the request body as json
+        """
+        log.error("Failed to load body as json\t%s", body)
 
     def send_msg(self, msg, status=sb.NotSpecified, exc_info=None):
         """
@@ -410,7 +425,7 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
                 try:
                     self.message_done(msg, final, message_key, exc_info=exc_info)
                 except Exception as error:
-                    log.exception(error)
+                    self.handle_message_done_error(error, msg, final, message_key, exc_info)
 
             async def doit():
                 info = {}
@@ -434,9 +449,7 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
                     del self.wsconnections[message_key]
 
                 if not res.cancelled():
-                    exc = res.exception()
-                    if exc and self.log_exceptions:
-                        log.exception(exc, exc_info=(type(exc), exc, exc.__traceback__))
+                    self.handle_request_done_exception(res.exception())
 
             t = create_task(doit(), name=f"<process_command: {body}>")
             t.add_done_callback(done)
@@ -460,6 +473,35 @@ class SimpleWebSocketBase(RequestsMixin, websocket.WebSocketHandler):
         exc_info
             The (exc_type, exc, traceback) for any exception that stopped the processing of the request
         """
+
+    def handle_message_done_error(self, error, msg, final, message_key, exc_info):
+        """
+        Hook for when message_done raised an exception
+
+        By default we ``log.exception(error)``
+
+        error
+            The exception that was raised
+
+        request
+            The original request
+
+        final
+            The last response to be sent back.
+
+        message_key
+            The uuid the server generated for this request
+
+        exc_info
+            The (exc_type, exc, traceback) for any exception that stopped the processing of the request
+            before message_done had been called
+        """
+        log.exception(error)
+
+    def handle_request_done_exception(self, error):
+        """Hook that takes in an exception from the entire request"""
+        if error and self.log_exceptions:
+            log.exception(error, exc_info=(type(error), error, error.__traceback__))
 
     def transform_progress(self, body, progress, **kwargs):
         """
