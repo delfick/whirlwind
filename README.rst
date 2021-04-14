@@ -8,7 +8,7 @@ Changlog
 
 .. _release-0-12-0:
 
-0.12.0 - TBD
+0.12.0 - 14 April 2021
     * Add a new ``make_application`` hook to the Server for changing the WSGI app
     * Made it easier to alter what gets logged
 
