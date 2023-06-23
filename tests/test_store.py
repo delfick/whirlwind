@@ -342,7 +342,6 @@ describe "Store":
                 class Command2(store.Command):
                     pass
 
-
 describe "command_spec":
     async it "normalises args into a function that makes the command and provides a function for execution":
         store = Store(default_path="/v1", formatter=MergedOptionStringFormatter)
