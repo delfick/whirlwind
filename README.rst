@@ -1,3 +1,8 @@
+DEPRECATED
+==========
+
+I don't use or maintain this project anymore
+
 Whirlwind
 =========
 
